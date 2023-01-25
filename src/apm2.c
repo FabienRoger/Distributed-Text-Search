@@ -113,9 +113,11 @@ int main(int argc, char **argv)
     int nb_patterns = 0;
     int i, j;
     char *buf;
+    char *own_buf;
     struct timeval t1, t2;
     double duration;
     int n_bytes;
+    int own_n_bytes;
     int *n_matches;
     int rank, comm_size;
 
@@ -201,6 +203,72 @@ int main(int argc, char **argv)
     MPI_Barrier(MPI_COMM_WORLD);
     gettimeofday(&t1, NULL);
 
+    // gather all files in the same buffer
+    // first get the lengths of each file
+    int *lengths = (int *)malloc(comm_size * sizeof(int));
+    MPI_Allgather(&own_n_bytes, 1, MPI_INT, lengths, 1, MPI_INT, MPI_COMM_WORLD);
+
+    // Allocate memory for the displacement array
+    int *displs = (int *)malloc(comm_size * sizeof(int));
+    // Fill the displacement array with the offsets for each process' data in the concatenated table
+    n_bytes = 0;
+    int own_start = 0;
+    int own_end = 0;
+    for (i = 0; i < comm_size; i++)
+    {
+        n_bytes += lengths[i];
+        displs[i] = (i == 0) ? 0 : (displs[i - 1] + lengths[i - 1]);
+        if (i == rank)
+        {
+            own_start = displs[i];
+            own_end = displs[i] + lengths[i];
+        }
+    }
+
+    // finds longest pattern
+    int max_pattern_length = 0;
+    for (i = 0; i < nb_patterns; i++)
+    {
+        if (strlen(pattern[i]) > max_pattern_length)
+        {
+            max_pattern_length = strlen(pattern[i]);
+        }
+    }
+
+    // send data to people who need it asynchronically
+    for (i = 0; i < comm_size; i++)
+    {
+        int other_start = displs[i] / sizeof(int);
+        int other_end_data = MIN2((rank + 1) * n_bytes / comm_size + max_pattern_length, n_bytes);
+
+        if (other_start < own_end && other_end_data > own_start)
+        {
+            int start = MAX2(other_start, own_start);
+            int end = MIN2(other_end_data, own_end);
+            int length = end - start;
+            MPI_Isend(buf + start, length, MPI_CHAR, i, 0, MPI_COMM_WORLD, NULL);
+        }
+    }
+
+    int start = rank * n_bytes / comm_size;
+    int end_data = MIN2((rank + 1) * n_bytes / comm_size, n_bytes) + max_pattern_length;
+    int end = MIN2((rank + 1) * n_bytes / comm_size, n_bytes);
+
+    // Allocate memory for the concatenated table on process 0
+    if (rank == 0)
+    {
+        buf = (int *)malloc(n_bytes * sizeof(int));
+    }
+
+    // then gather all the files in the same buffer
+    MPI_Gatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+    if (rank != 0)
+    {
+        MPI_Finalize();
+        return 0;
+    }
+
     /* Check each pattern one by one */
     for (i = 0; i < nb_patterns; i++)
     {
@@ -219,8 +287,6 @@ int main(int argc, char **argv)
         }
 
         /* Traverse the input data up to the end of the file */
-        int start = rank * n_bytes / comm_size;
-        int end = MIN2((rank + 1) * n_bytes / comm_size, n_bytes);
         for (j = start; j < end; j++)
         {
             int distance = 0;
