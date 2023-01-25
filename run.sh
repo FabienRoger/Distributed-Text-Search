@@ -27,3 +27,4 @@ salloc -N 8 -n 64 mpirun out/apm4 1 dna/large GGGAGCAGTCATATC GGGAGCAGTCATATC GG
 
 
 mpicc -o out/apm1 src/apm1.c -Wall; salloc -N 1 -n 2 mpirun out/apm1 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
+mpicc -o out/apm2 src/apm2.c -Wall; salloc -N 1 -n 2 mpirun out/apm2 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;

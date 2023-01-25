@@ -79,6 +79,7 @@ read_input_file(char *filename, int *size)
 
 #define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
 #define MIN2(a, b) (a < b ? a : b)
+#define MAX2(a, b) (a > b ? a : b)
 
 int levenshtein(char *s1, char *s2, int len, int *column)
 {
@@ -103,6 +104,12 @@ int levenshtein(char *s1, char *s2, int len, int *column)
         }
     }
     return (column[len]);
+}
+
+void fill_data_bounds(int rank, int comm_size, int max_pattern_length, int n_bytes, int *start, int *end_data)
+{
+    *start = rank * n_bytes / comm_size;
+    *end_data = MIN2((rank + 1) * n_bytes / comm_size, n_bytes) + max_pattern_length;
 }
 
 int main(int argc, char **argv)
@@ -180,10 +187,10 @@ int main(int argc, char **argv)
                "looking for %d pattern(s) in file %s w/ distance of %d\n",
                nb_patterns, filename, approx_factor);
 
-    buf = read_input_file(filename, &n_bytes);
-    if (buf == NULL)
+    own_buf = read_input_file(filename, &own_n_bytes);
+    if (own_buf == NULL)
     {
-        return 1;
+        own_n_bytes = 0;
     }
 
     /* Allocate the array of matches */
@@ -238,36 +245,56 @@ int main(int argc, char **argv)
     // send data to people who need it asynchronically
     for (i = 0; i < comm_size; i++)
     {
-        int other_start = displs[i] / sizeof(int);
-        int other_end_data = MIN2((rank + 1) * n_bytes / comm_size + max_pattern_length, n_bytes);
+        int other_start, other_end_data;
+        fill_data_bounds(i, comm_size, max_pattern_length, n_bytes, &other_start, &other_end_data);
 
         if (other_start < own_end && other_end_data > own_start)
         {
-            int start = MAX2(other_start, own_start);
-            int end = MIN2(other_end_data, own_end);
-            int length = end - start;
-            MPI_Isend(buf + start, length, MPI_CHAR, i, 0, MPI_COMM_WORLD, NULL);
+            int s = MAX2(other_start, own_start);
+            int e = MIN2(other_end_data, own_end);
+            int length = e - s;
+            if (length < 0)
+            {
+                printf("ERROR: length is negative! (start: %d, end: %d, other_start: %d, other_end_data: %d, own_start: %d, own_end: %d)\n", s, e, other_start, other_end_data, own_start, own_end);
+                return 1;
+            }
+            MPI_Isend(own_buf + s - own_start, length, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     }
 
-    int start = rank * n_bytes / comm_size;
-    int end_data = MIN2((rank + 1) * n_bytes / comm_size, n_bytes) + max_pattern_length;
+    int start, end_data;
+    fill_data_bounds(rank, comm_size, max_pattern_length, n_bytes, &start, &end_data);
+    char *actual_data = (char *)malloc((end_data - start) * sizeof(char));
+    if (actual_data == NULL)
+    {
+        fprintf(stderr, "Error: unable to allocate memory for %ldB\n",
+                (end_data - start) * sizeof(int));
+        return 1;
+    }
+
+    // fill the actual data by recv'ing from other processes
+    for (i = 0; i < comm_size; i++)
+    {
+        int other_start = displs[i];
+        int other_end_data = displs[i] + lengths[i];
+
+        if (other_start < start && other_end_data > end_data)
+        {
+            int s = MAX2(other_start, own_start);
+            int e = MIN2(other_end_data, own_end);
+            int length = e - s;
+            if (length < 0)
+            {
+                printf("ERROR: length is negative! (start: %d, end: %d, other_start: %d, other_end_data: %d, own_start: %d, own_end: %d)\n", s, e, other_start, other_end_data, own_start, own_end);
+                return 1;
+            }
+            MPI_Recv(actual_data + s - start, length, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+
+    buf = actual_data - start; // make the buffer start at "the beginning" of the data
+
     int end = MIN2((rank + 1) * n_bytes / comm_size, n_bytes);
-
-    // Allocate memory for the concatenated table on process 0
-    if (rank == 0)
-    {
-        buf = (int *)malloc(n_bytes * sizeof(int));
-    }
-
-    // then gather all the files in the same buffer
-    MPI_Gatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, 0, MPI_COMM_WORLD);
-
-    if (rank != 0)
-    {
-        MPI_Finalize();
-        return 0;
-    }
 
     /* Check each pattern one by one */
     for (i = 0; i < nb_patterns; i++)

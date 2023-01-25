@@ -226,13 +226,10 @@ int main(int argc, char **argv)
     }
 
     // Allocate memory for the concatenated table on process 0
-    if (rank == 0)
-    {
-        buf = (int *)malloc(n_bytes * sizeof(int));
-    }
+    buf = (int *)malloc(n_bytes * sizeof(int));
 
     // then gather all the files in the same buffer
-    MPI_AllGatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Allgatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, MPI_COMM_WORLD);
 
     /* Check each pattern one by one */
     for (i = 0; i < nb_patterns; i++)
