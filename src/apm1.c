@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <mpi.h>
 
 #define APM_DEBUG 0
 
@@ -111,10 +112,17 @@ int main(int argc, char **argv)
     int nb_patterns = 0;
     int i, j;
     char *buf;
+    char *own_buf;
     struct timeval t1, t2;
     double duration;
     int n_bytes;
+    int own_n_bytes;
     int *n_matches;
+    int rank, comm_size;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
     /* Check number of arguments */
     if (argc < 4)
@@ -128,7 +136,7 @@ int main(int argc, char **argv)
     /* Get the distance factor */
     approx_factor = atoi(argv[1]);
 
-    /* Grab the filename containing the target text */
+    /* Grab the foldername containing the target text */
     int len = strlen(argv[2]);
     filename = (char *)malloc((len + 10) * sizeof(char));
     if (filename == NULL)
@@ -138,7 +146,7 @@ int main(int argc, char **argv)
     }
     strncpy(filename, argv[2], len);
     // concat "/rank.txt" to the filemame (where rank is the rank of the process)
-    sprintf(filename + len, "/%d.txt", 0);
+    sprintf(filename + len, "/%d.txt", rank);
 
     /* Get the number of patterns that the user wants to search for */
     nb_patterns = argc - 3;
@@ -174,15 +182,15 @@ int main(int argc, char **argv)
 
         strncpy(pattern[i], argv[i + 3], (l + 1));
     }
+    if (rank == 0)
+        printf("Approximate Pattern Mathing: "
+               "looking for %d pattern(s) in file %s w/ distance of %d\n",
+               nb_patterns, filename, approx_factor);
 
-    printf("Approximate Pattern Mathing: "
-           "looking for %d pattern(s) in file %s w/ distance of %d\n",
-           nb_patterns, filename, approx_factor);
-
-    buf = read_input_file(filename, &n_bytes);
-    if (buf == NULL)
+    own_buf = read_input_file(filename, &own_n_bytes);
+    if (own_buf == NULL)
     {
-        return 1;
+        own_n_bytes = 0;
     }
 
     /* Allocate the array of matches */
@@ -200,6 +208,31 @@ int main(int argc, char **argv)
 
     /* Timer start */
     gettimeofday(&t1, NULL);
+
+    // gather all files in the same buffer
+    // first get the lengths of each file
+    int *lengths = (int *)malloc(comm_size * sizeof(int));
+    MPI_Allgather(&own_n_bytes, 1, MPI_INT, lengths, 1, MPI_INT, MPI_COMM_WORLD);
+
+    // Allocate memory for the displacement array
+    int *displs = (int *)malloc(comm_size * sizeof(int));
+    // Fill the displacement array with the offsets for each process' data in the concatenated table
+    displs[0] = 0;
+    n_bytes = lengths[0];
+    for (i = 1; i < comm_size; i++)
+    {
+        n_bytes += lengths[i];
+        displs[i] = displs[i - 1] + lengths[i - 1];
+    }
+
+    // Allocate memory for the concatenated table on process 0
+    if (rank == 0)
+    {
+        buf = (int *)malloc(n_bytes * sizeof(int));
+    }
+
+    // then gather all the files in the same buffer
+    MPI_AllGatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, 0, MPI_COMM_WORLD);
 
     /* Check each pattern one by one */
     for (i = 0; i < nb_patterns; i++)
@@ -255,17 +288,19 @@ int main(int argc, char **argv)
 
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
-    printf("%s done in %lf s\n", argv[0], duration);
+    if (rank == 0)
+        printf("%s done in %lf s (size ; %d)\n", argv[0], duration, comm_size);
 
     /*****
      * END MAIN LOOP
      ******/
-
-    for (i = 0; i < nb_patterns; i++)
-    {
-        printf("Number of matches for pattern <%s>: %d\n",
-               pattern[i], n_matches[i]);
-    }
+    if (rank == 0)
+        for (i = 0; i < nb_patterns; i++)
+        {
+            printf("Number of matches for pattern <%s>: %d\n",
+                   pattern[i], n_matches[i]);
+        }
+    MPI_Finalize();
 
     return 0;
 }

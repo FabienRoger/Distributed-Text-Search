@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <mpi.h>
 
 #define APM_DEBUG 0
 
@@ -77,6 +78,7 @@ read_input_file(char *filename, int *size)
 }
 
 #define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
+#define MIN2(a, b) (a < b ? a : b)
 
 int levenshtein(char *s1, char *s2, int len, int *column)
 {
@@ -115,6 +117,11 @@ int main(int argc, char **argv)
     double duration;
     int n_bytes;
     int *n_matches;
+    int rank, comm_size;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
     /* Check number of arguments */
     if (argc < 4)
@@ -129,16 +136,7 @@ int main(int argc, char **argv)
     approx_factor = atoi(argv[1]);
 
     /* Grab the filename containing the target text */
-    int len = strlen(argv[2]);
-    filename = (char *)malloc((len + 10) * sizeof(char));
-    if (filename == NULL)
-    {
-        fprintf(stderr, "Unable to allocate string of size %d\n", len);
-        return 1;
-    }
-    strncpy(filename, argv[2], len);
-    // concat "/rank.txt" to the filemame (where rank is the rank of the process)
-    sprintf(filename + len, "/%d.txt", 0);
+    filename = argv[2];
 
     /* Get the number of patterns that the user wants to search for */
     nb_patterns = argc - 3;
@@ -175,9 +173,10 @@ int main(int argc, char **argv)
         strncpy(pattern[i], argv[i + 3], (l + 1));
     }
 
-    printf("Approximate Pattern Mathing: "
-           "looking for %d pattern(s) in file %s w/ distance of %d\n",
-           nb_patterns, filename, approx_factor);
+    if (rank == 0)
+        printf("Approximate Pattern Mathing: "
+               "looking for %d pattern(s) in file %s w/ distance of %d\n",
+               nb_patterns, filename, approx_factor);
 
     buf = read_input_file(filename, &n_bytes);
     if (buf == NULL)
@@ -199,6 +198,7 @@ int main(int argc, char **argv)
      ******/
 
     /* Timer start */
+    MPI_Barrier(MPI_COMM_WORLD);
     gettimeofday(&t1, NULL);
 
     /* Check each pattern one by one */
@@ -219,7 +219,9 @@ int main(int argc, char **argv)
         }
 
         /* Traverse the input data up to the end of the file */
-        for (j = 0; j < n_bytes; j++)
+        int start = rank * n_bytes / comm_size;
+        int end = MIN2((rank + 1) * n_bytes / comm_size, n_bytes);
+        for (j = start; j < end; j++)
         {
             int distance = 0;
             int size;
@@ -250,22 +252,33 @@ int main(int argc, char **argv)
         free(column);
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    // reduce the number of matches
+    for (i = 0; i < nb_patterns; i++)
+    {
+        int tmp;
+        MPI_Reduce(&n_matches[i], &tmp, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        n_matches[i] = tmp;
+    }
+
     /* Timer stop */
     gettimeofday(&t2, NULL);
 
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
-    printf("%s done in %lf s\n", argv[0], duration);
+    if (rank == 0)
+        printf("%s done in %lf s (size ; %d)\n", argv[0], duration, comm_size);
 
     /*****
      * END MAIN LOOP
      ******/
-
-    for (i = 0; i < nb_patterns; i++)
-    {
-        printf("Number of matches for pattern <%s>: %d\n",
-               pattern[i], n_matches[i]);
-    }
+    if (rank == 0)
+        for (i = 0; i < nb_patterns; i++)
+        {
+            printf("Number of matches for pattern <%s>: %d\n",
+                   pattern[i], n_matches[i]);
+        }
+    MPI_Finalize();
 
     return 0;
 }
