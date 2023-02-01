@@ -25,7 +25,7 @@ read_input_file(char *filename, int *size)
     fd = open(filename, O_RDONLY);
     if (fd == -1)
     {
-        fprintf(stderr, "Unable to open the text file <%s>\n", filename);
+        // fprintf(stderr, "Unable to open the text file <%s>\n", filename);
         return NULL;
     }
 
@@ -118,6 +118,8 @@ int main(int argc, char **argv)
     int n_bytes;
     int *n_matches;
     int rank, comm_size;
+    char *own_buf;
+    int own_n_bytes;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -136,7 +138,16 @@ int main(int argc, char **argv)
     approx_factor = atoi(argv[1]);
 
     /* Grab the filename containing the target text */
-    filename = argv[2];
+    int len = strlen(argv[2]);
+    filename = (char *)malloc((len + 10) * sizeof(char));
+    if (filename == NULL)
+    {
+        fprintf(stderr, "Unable to allocate string of size %d\n", len);
+        return 1;
+    }
+    strncpy(filename, argv[2], len);
+    // concat "/rank.txt" to the filemame (where rank is the rank of the process)
+    sprintf(filename + len, "/%d.txt", rank);
 
     /* Get the number of patterns that the user wants to search for */
     nb_patterns = argc - 3;
@@ -178,10 +189,10 @@ int main(int argc, char **argv)
                "looking for %d pattern(s) in file %s w/ distance of %d\n",
                nb_patterns, filename, approx_factor);
 
-    buf = read_input_file(filename, &n_bytes);
-    if (buf == NULL)
+    own_buf = read_input_file(filename, &own_n_bytes);
+    if (own_buf == NULL)
     {
-        return 1;
+        own_n_bytes = 0;
     }
 
     /* Allocate the array of matches */
@@ -200,6 +211,28 @@ int main(int argc, char **argv)
     /* Timer start */
     MPI_Barrier(MPI_COMM_WORLD);
     gettimeofday(&t1, NULL);
+
+    // gather all files in the same buffer
+    // first get the lengths of each file
+    int *lengths = (int *)malloc(comm_size * sizeof(int));
+    MPI_Allgather(&own_n_bytes, 1, MPI_INT, lengths, 1, MPI_INT, MPI_COMM_WORLD);
+
+    // Allocate memory for the displacement array
+    int *displs = (int *)malloc(comm_size * sizeof(int));
+    // Fill the displacement array with the offsets for each process' data in the concatenated table
+    displs[0] = 0;
+    n_bytes = lengths[0];
+    for (i = 1; i < comm_size; i++)
+    {
+        n_bytes += lengths[i];
+        displs[i] = displs[i - 1] + lengths[i - 1];
+    }
+
+    // Allocate memory for the concatenated table on process 0
+    buf = (char *)malloc(n_bytes * sizeof(char));
+
+    // then gather all the files in the same buffer
+    MPI_Allgatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, MPI_COMM_WORLD);
 
     for (i = 0; i < nb_patterns; i++)
     {
@@ -269,7 +302,7 @@ int main(int argc, char **argv)
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
     if (rank == 0)
-        printf("%s done in %lf s (size ; %d)\n", argv[0], duration, comm_size);
+        printf("%s done in %lf s (size ; %d)\n\n", argv[0], duration, comm_size);
 
     /*****
      * END MAIN LOOP
