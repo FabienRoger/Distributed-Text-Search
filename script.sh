@@ -1,16 +1,8 @@
 #!/bin/bash
 
-# Iterate through all files in the "dna" directory
-for file in dna/*; do
-    # Get the name of the file without the file extension
-    filename=$(basename "$file" .txt)
-    # Check if the file named "0.txt" exists in the same directory as the current file
-    if [ -f dna/"$filename"/0.txt ]; then
-        # Check if the directory already exists, if not create it
-        if [ ! -d dna/"$filename" ]; then
-            mkdir dna/"$filename"
-        fi
-        # Move the current file to the directory with the same name as the file containing "0.txt"
-        mv "$file" dna/"$filename"/
-    fi
-done
+
+mpicc -o out/apm1 src/apm1.c -Wall;
+mpicc -o out/apm2 src/apm2.c -Wall;
+./apm 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
+salloc -N 1 -n 1 mpirun out/apm1 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
+salloc -N 1 -n 1 mpirun out/apm2 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;

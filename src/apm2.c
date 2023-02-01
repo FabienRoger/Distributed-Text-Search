@@ -112,6 +112,11 @@ void fill_data_bounds(int rank, int comm_size, int max_pattern_length, int n_byt
     *end_data = MIN2((rank + 1) * n_bytes / comm_size, n_bytes) + max_pattern_length;
 }
 
+int intersect(int start, int end, int start2, int end2)
+{
+    return (start < end2 && end > start2);
+}
+
 int main(int argc, char **argv)
 {
     char **pattern;
@@ -145,7 +150,16 @@ int main(int argc, char **argv)
     approx_factor = atoi(argv[1]);
 
     /* Grab the filename containing the target text */
-    filename = argv[2];
+    int len = strlen(argv[2]);
+    filename = (char *)malloc((len + 10) * sizeof(char));
+    if (filename == NULL)
+    {
+        fprintf(stderr, "Unable to allocate string of size %d\n", len);
+        return 1;
+    }
+    strncpy(filename, argv[2], len);
+    // concat "/rank.txt" to the filemame (where rank is the rank of the process)
+    sprintf(filename + len, "/%d.txt", rank);
 
     /* Get the number of patterns that the user wants to search for */
     nb_patterns = argc - 3;
@@ -243,12 +257,13 @@ int main(int argc, char **argv)
     }
 
     // send data to people who need it asynchronically
+    MPI_Request req;
     for (i = 0; i < comm_size; i++)
     {
         int other_start, other_end_data;
         fill_data_bounds(i, comm_size, max_pattern_length, n_bytes, &other_start, &other_end_data);
 
-        if (other_start < own_end && other_end_data > own_start)
+        if (intersect(own_start, own_end, other_start, other_end_data))
         {
             int s = MAX2(other_start, own_start);
             int e = MIN2(other_end_data, own_end);
@@ -258,7 +273,7 @@ int main(int argc, char **argv)
                 printf("ERROR: length is negative! (start: %d, end: %d, other_start: %d, other_end_data: %d, own_start: %d, own_end: %d)\n", s, e, other_start, other_end_data, own_start, own_end);
                 return 1;
             }
-            MPI_Isend(own_buf + s - own_start, length, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Isend(own_buf + s - own_start, length, MPI_CHAR, i, 0, MPI_COMM_WORLD, &req);
         }
     }
 
@@ -278,10 +293,10 @@ int main(int argc, char **argv)
         int other_start = displs[i];
         int other_end_data = displs[i] + lengths[i];
 
-        if (other_start < start && other_end_data > end_data)
+        if (intersect(start, end_data, other_start, other_end_data))
         {
-            int s = MAX2(other_start, own_start);
-            int e = MIN2(other_end_data, own_end);
+            int s = MAX2(other_start, start);
+            int e = MIN2(other_end_data, end_data);
             int length = e - s;
             if (length < 0)
             {
