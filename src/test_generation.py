@@ -27,15 +27,15 @@ def generate_random_string(length, nb=1):
 
 list_len_database = list(range(20, 200, 20)) + list(range(200, 2_000, 200)) + list(range(2_000, 10_000, 2_000)) + list(range(10_000, 100_000, 10_000)) + [500_000, 1_000_000]
 
-list_nb_pattern = list(range(1, 20)) + list(range(20, 200, 20)) + list(range(200, 2_000, 200)) + list(range(2_000, 10_000, 2_000))
+list_nb_pattern = list(range(1, 20)) + list(range(20, 200, 20)) + list(range(200, 2_000, 200))
 
-list_len_pattern = [1, 5, 10, 20, 100]
+list_len_pattern = [1, 5, 10, 20]
 
 list_approximation_factor = [0, 1, 4]
 
 base_dir = Path(__file__).parent.parent.resolve()
-exec_to_test = base_dir / "out/apm1"
-exec_seq = base_dir / "out/apm4"
+exec_to_test = base_dir / "out/apm_omp_forloop"
+exec_seq = base_dir / "out/apm1"
 tmp_dir = base_dir / "obj"
 path_tmp_database = tmp_dir / "0.txt"
 
