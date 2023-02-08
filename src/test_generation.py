@@ -11,6 +11,7 @@ from pathlib import Path
 if len(sys.argv) < 2:
     print(f"Usage {sys.argv[0]} N")
     print(f"\t-N : number of instances to test")
+    exit()
 
 
 def generate_random_string(length, nb=1):
