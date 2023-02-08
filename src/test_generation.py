@@ -32,6 +32,9 @@ list_len_pattern = [1, 5, 10, 20, 100]
 
 list_approximation_factor = [0, 1, 4]
 
+list_files_to_open = [1, 2, 10]
+
+cmd = "salloc -N 8 -n 64 mpirun" 
 base_dir = Path(__file__).parent.parent.resolve()
 exec_to_test = base_dir / "out/apm1"
 exec_seq = base_dir / "out/apm4"
@@ -42,7 +45,7 @@ regex_exec_time = re.compile(r"done in ([0-9\.]*) s")
 regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)")
 
 
-test_instances = list(itertools.product(list_len_database, list_nb_pattern, list_len_pattern, list_approximation_factor))
+test_instances = list(itertools.product(list_len_database, list_nb_pattern, list_len_pattern, list_approximation_factor, list_files_to_open))
 
 random.shuffle(test_instances)
 
@@ -54,14 +57,20 @@ total_runtime_to_test = 0
 
 print(f"testing {exec_to_test} relative to {exec_seq}")
 
-for (len_database, nb_pattern, len_pattern, approximation_factor) in test_instances:
-    database = generate_random_string(len_database)[0]
+for (len_database, nb_pattern, len_pattern, approximation_factor, files_to_open) in test_instances:
+    databases = generate_random_string(len_database, files_to_open)
+    # keep a random subset of the databases
+    for i, database in enumerate(databases):
+        database = database[:random.randint(1, len(database))]
+    
     # We write down the database on the file system
-    path_tmp_database.write_text(database)
+    for i, database in enumerate(databases):
+        path_tmp_database = tmp_dir / f"{i}.txt"
+        path_tmp_database.write_text(database)
 
     patterns = generate_random_string(len_pattern, nb_pattern)
-    command_to_test = f"{exec_to_test} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
-    command_seq = f"{exec_seq} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
+    command_to_test = f"{cmd} {exec_to_test} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
+    command_seq = f"{cmd} {exec_seq} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
 
     output_to_test = subprocess.check_output([exec_to_test, str(approximation_factor), tmp_dir] + patterns).decode()
     output_seq = subprocess.check_output([exec_seq, str(approximation_factor), tmp_dir] + patterns).decode()
