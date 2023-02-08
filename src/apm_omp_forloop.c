@@ -201,54 +201,57 @@ int main(int argc, char **argv)
 
     /* Timer start */
     gettimeofday(&t1, NULL);
-
-    /* Check each pattern one by one */
-    for (i = 0; i < nb_patterns; i++)
+    #pragma omp parallel
     {
-        int size_pattern = strlen(pattern[i]);
-        int *column;
-
-        /* Initialize the number of matches to 0 */
-        n_matches[i] = 0;
-
-        column = (int *)malloc((size_pattern + 1) * sizeof(int));
-        if (column == NULL)
+        /* Check each pattern one by one */
+        for (i = 0; i < nb_patterns; i++)
         {
-            fprintf(stderr, "Error: unable to allocate memory for column (%ldB)\n",
-                    (size_pattern + 1) * sizeof(int));
-            return 1;
+            int size_pattern = strlen(pattern[i]);
+            int *column;
+
+            /* Initialize the number of matches to 0 */
+            n_matches[i] = 0;
+
+            column = (int *)malloc((size_pattern + 1) * sizeof(int));
+            if (column == NULL)
+            {
+                fprintf(stderr, "Error: unable to allocate memory for column (%ldB)\n",
+                        (size_pattern + 1) * sizeof(int));
+                return 1;
+            }
+
+            /* Traverse the input data up to the end of the file */
+            #pragma omp for
+            for (j = 0; j < n_bytes; j++)
+            {
+                int distance = 0;
+                int size;
+
+    #if APM_DEBUG
+                if (j % 100 == 0)
+                {
+                    printf("Procesing byte %d (out of %d)\n", j, n_bytes);
+                }
+    #endif
+
+                size = size_pattern;
+                if (n_bytes - j < size_pattern)
+                {
+                    size = n_bytes - j;
+                }
+
+                distance = levenshtein(pattern[i], &buf[j], size, column);
+
+                if (distance <= approx_factor)
+                {
+                    n_matches[i]++;
+                    // printf("Match found at position %d for pattern <%s> (distance: %d)\n",
+                    //        j, pattern[i], distance);
+                }
+            }
+
+            free(column);
         }
-
-        /* Traverse the input data up to the end of the file */
-        for (j = 0; j < n_bytes; j++)
-        {
-            int distance = 0;
-            int size;
-
-#if APM_DEBUG
-            if (j % 100 == 0)
-            {
-                printf("Procesing byte %d (out of %d)\n", j, n_bytes);
-            }
-#endif
-
-            size = size_pattern;
-            if (n_bytes - j < size_pattern)
-            {
-                size = n_bytes - j;
-            }
-
-            distance = levenshtein(pattern[i], &buf[j], size, column);
-
-            if (distance <= approx_factor)
-            {
-                n_matches[i]++;
-                // printf("Match found at position %d for pattern <%s> (distance: %d)\n",
-                //        j, pattern[i], distance);
-            }
-        }
-
-        free(column);
     }
 
     /* Timer stop */
