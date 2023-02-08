@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     char *filename;
     int approx_factor = 0;
     int nb_patterns = 0;
-    int i, j;
+    int i;
     char *buf;
     struct timeval t1, t2;
     double duration;
@@ -201,9 +201,10 @@ int main(int argc, char **argv)
 
     /* Timer start */
     gettimeofday(&t1, NULL);
-    #pragma omp parallel
-    {
-        /* Check each pattern one by one */
+    /* Check each pattern one by one */
+    #pragma omp parallel default(none) shared(nb_patterns, pattern, n_matches, n_bytes, buf, approx_factor)
+    {   
+        #pragma omp for
         for (i = 0; i < nb_patterns; i++)
         {
             int size_pattern = strlen(pattern[i]);
@@ -213,15 +214,15 @@ int main(int argc, char **argv)
             n_matches[i] = 0;
 
             column = (int *)malloc((size_pattern + 1) * sizeof(int));
-            if (column == NULL)
-            {
-                fprintf(stderr, "Error: unable to allocate memory for column (%ldB)\n",
-                        (size_pattern + 1) * sizeof(int));
-                return 1;
-            }
+            // if (column == NULL)
+            // {
+            //     fprintf(stderr, "Error: unable to allocate memory for column (%ldB)\n",
+            //             (size_pattern + 1) * sizeof(int));
+            //     return 1;
+            // }
 
             /* Traverse the input data up to the end of the file */
-            #pragma omp for
+            int j;
             for (j = 0; j < n_bytes; j++)
             {
                 int distance = 0;
