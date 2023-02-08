@@ -5,7 +5,11 @@ import itertools
 import os
 import re
 import subprocess
+import sys
 
+if len(sys.argv) < 2:
+    print(f"Usage {sys.argv[0]} N")
+    print(f"\t-N : number of instances to test")
 
 def generate_random_string(length, nb=1):
     chars = list(string.ascii_uppercase)
@@ -27,7 +31,7 @@ list_len_pattern = [1, 5, 10, 20, 100]
 list_approximation_factor = [0, 1, 4]
 
 exec_to_test = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/out/apm1"
-exec_seq = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/out/apm4"
+exec_seq = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/out/apm1"
 tmp_dir = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/obj"
 path_tmp_database = tmp_dir + "/0.txt"
 
@@ -37,10 +41,15 @@ regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)"
 
 test_instances = list(itertools.product(list_len_database, list_nb_pattern, list_len_pattern, list_approximation_factor))
 
-# random.shuffle(test_instances)
+random.shuffle(test_instances)
 
 correct_result = 0
 tested_instances = 0
+
+total_runtime_seq = 0
+total_runtime_to_test = 0
+
+print(f"testing {exec_to_test} relative to {exec_seq}")
 
 for (len_database, nb_pattern, len_pattern, approximation_factor) in test_instances:
     database = generate_random_string(len_database)[0]
@@ -69,10 +78,18 @@ for (len_database, nb_pattern, len_pattern, approximation_factor) in test_instan
     tested_instances += 1
     correct_result += seq_dic_result == parallel_dic_result
 
-    print(tested_instances, correct_result)
-    print(seq_time, parallel_time)
-    print("-------------------------------------------")
+    total_runtime_seq += seq_time
+    total_runtime_to_test += parallel_time
+
+    # print(tested_instances, correct_result)
+    # print(seq_time, parallel_time)
+    # print("-------------------------------------------")
     # Delete the tmp file
     # os.remove(path_tmp_database)
-    if tested_instances > 99:
+    if tested_instances >= int(sys.argv[1]):
         break
+
+
+print(f"{correct_result} correct result out of {tested_instances}")
+print(f"sequential runtime : {total_runtime_seq:.6f} s")
+print(f"parallel runtime : {total_runtime_to_test:.6f} s")
