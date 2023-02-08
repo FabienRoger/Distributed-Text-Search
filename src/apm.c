@@ -255,7 +255,7 @@ int main(int argc, char **argv)
 
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
-    printf("%s done in %lf s\n", argv[0], duration);
+    printf("%s done in %lf s\n\n", argv[0], duration);
 
     /*****
      * END MAIN LOOP

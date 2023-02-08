@@ -6,10 +6,12 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 if len(sys.argv) < 2:
     print(f"Usage {sys.argv[0]} N")
     print(f"\t-N : number of instances to test")
+
 
 def generate_random_string(length, nb=1):
     chars = list(string.ascii_uppercase)
@@ -30,10 +32,11 @@ list_len_pattern = [1, 5, 10, 20, 100]
 
 list_approximation_factor = [0, 1, 4]
 
-exec_to_test = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/out/apm1"
-exec_seq = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/out/apm1"
-tmp_dir = "/users/eleves-a/2020/raphael.habsieger/TD/INF560/Distributed-Text-Search/obj"
-path_tmp_database = tmp_dir + "/0.txt"
+base_dir = Path(__file__).parent.parent.resolve()
+exec_to_test = base_dir / "out/apm1"
+exec_seq = base_dir / "out/apm4"
+tmp_dir = base_dir / "obj"
+path_tmp_database = tmp_dir / "0.txt"
 
 regex_exec_time = re.compile(r"done in ([0-9\.]*) s")
 regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)")
@@ -54,9 +57,7 @@ print(f"testing {exec_to_test} relative to {exec_seq}")
 for (len_database, nb_pattern, len_pattern, approximation_factor) in test_instances:
     database = generate_random_string(len_database)[0]
     # We write down the database on the file system
-    tmp_file = open(path_tmp_database, 'w')
-    tmp_file.write(database)
-    tmp_file.close()
+    path_tmp_database.write_text(database)
 
     patterns = generate_random_string(len_pattern, nb_pattern)
     command_to_test = f"{exec_to_test} {approximation_factor} {tmp_dir} {' '.join(patterns)}"

@@ -25,7 +25,7 @@ read_input_file(char *filename, int *size)
     fd = open(filename, O_RDONLY);
     if (fd == -1)
     {
-        fprintf(stderr, "Unable to open the text file <%s>\n", filename);
+        // fprintf(stderr, "Unable to open the text file <%s>\n", filename);
         return NULL;
     }
 
@@ -113,10 +113,10 @@ int main(int argc, char **argv)
     int i, j;
     char *buf;
     char *own_buf;
+    int own_n_bytes;
     struct timeval t1, t2;
     double duration;
     int n_bytes;
-    int own_n_bytes;
     int *n_matches;
     int rank, comm_size;
 
@@ -226,7 +226,7 @@ int main(int argc, char **argv)
     }
 
     // Allocate memory for the concatenated table on process 0
-    buf = (int *)malloc(n_bytes * sizeof(int));
+    buf = (char *)malloc(n_bytes * sizeof(char));
 
     // then gather all the files in the same buffer
     MPI_Allgatherv(own_buf, own_n_bytes, MPI_CHAR, buf, lengths, displs, MPI_CHAR, MPI_COMM_WORLD);
@@ -286,7 +286,7 @@ int main(int argc, char **argv)
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
     if (rank == 0)
-        printf("%s done in %lf s (size ; %d)\n", argv[0], duration, comm_size);
+        printf("%s done in %lf s (size ; %d)\n\n", argv[0], duration, comm_size);
 
     /*****
      * END MAIN LOOP

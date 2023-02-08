@@ -25,7 +25,7 @@ read_input_file(char *filename, int *size)
     fd = open(filename, O_RDONLY);
     if (fd == -1)
     {
-        fprintf(stderr, "Unable to open the text file <%s>\n", filename);
+        // fprintf(stderr, "Unable to open the text file <%s>\n", filename);
         return NULL;
     }
 
@@ -109,7 +109,7 @@ int levenshtein(char *s1, char *s2, int len, int *column)
 void fill_data_bounds(int rank, int comm_size, int max_pattern_length, int n_bytes, int *start, int *end_data)
 {
     *start = rank * n_bytes / comm_size;
-    *end_data = MIN2((rank + 1) * n_bytes / comm_size, n_bytes) + max_pattern_length;
+    *end_data = MIN2(MIN2((rank + 1) * n_bytes / comm_size, n_bytes) + max_pattern_length, n_bytes);
 }
 
 int intersect(int start, int end, int start2, int end2)
@@ -125,11 +125,11 @@ int main(int argc, char **argv)
     int nb_patterns = 0;
     int i, j;
     char *buf;
-    char *own_buf;
     struct timeval t1, t2;
     double duration;
     int n_bytes;
     int own_n_bytes;
+    char *own_buf;
     int *n_matches;
     int rank, comm_size;
 
@@ -375,7 +375,7 @@ int main(int argc, char **argv)
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
     if (rank == 0)
-        printf("%s done in %lf s (size ; %d)\n", argv[0], duration, comm_size);
+        printf("%s done in %lf s (size ; %d)\n\n", argv[0], duration, comm_size);
 
     /*****
      * END MAIN LOOP
