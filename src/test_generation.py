@@ -11,17 +11,21 @@ from tqdm import tqdm
 from time import time
 
 seq = "apm1"
-to_test = "apm4"
+to_test = "flexible_mpi"
 
 print("compiling")
 os.system(f"mpicc -o out/{seq} src/{seq}.c")
-os.system(f"mpicc -o out/{to_test} src/{to_test}.c")
+os.system(f"mpicc -fopenmp -o out/{to_test} src/{to_test}.c")
 os.system(f"mkdir -p obj")
 # remove obj files
 os.system(f"rm -f obj/*.txt")
 
+cmd = "salloc -N 1 -n 8 mpirun"
 
-cmd = "salloc -N 1 -n 8 mpirun" 
+additional_env_vars = {
+    "TEST": "1",
+}
+
 base_dir = Path(__file__).parent.parent.resolve()
 exec_to_test = base_dir / "out" / to_test
 exec_seq = base_dir / "out" / seq
@@ -107,7 +111,7 @@ for (len_database, nb_pattern, len_pattern, approximation_factor, files_to_open)
     command_to_test = f"{cmd} {exec_to_test} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
     command_seq = f"{cmd} {exec_seq} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
 
-    output_to_test = subprocess.check_output(command_to_test.split()).decode()
+    output_to_test = subprocess.check_output(command_to_test.split(), env=dict(os.environ, **additional_env_vars)).decode()
     output_seq = subprocess.check_output(command_seq.split()).decode()
     
     runtime_to_run += time() - st

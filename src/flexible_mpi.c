@@ -10,11 +10,22 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <mpi.h>
+#include <omp.h>
 
 #define APM_DEBUG 0
 
-char *
-read_input_file(char *filename, int *size)
+void get_env_var(char *var_name, int def, int *var_value)
+{
+    char *env_var = getenv(var_name);
+    if (env_var == NULL)
+    {
+        *var_value = def;
+        return;
+    }
+    *var_value = atoi(env_var);
+}
+
+char *read_input_file(char *filename, int *size)
 {
     char *buf;
     off_t fsize;
@@ -157,6 +168,82 @@ int intersect(int start, int end, int start2, int end2)
     return (start < end2 && end > start2);
 }
 
+void parse_args(int argc, char **argv, int rank, int *approx_factor, char **filename, char ***pattern, int *nb_patterns)
+{
+    /* Check number of arguments */
+    if (argc < 4)
+    {
+        printf("Usage: %s approximation_factor "
+               "dna_database pattern1 pattern2 ...\n",
+               argv[0]);
+        exit(1);
+    }
+
+    /* Get the distance factor */
+    *approx_factor = atoi(argv[1]);
+
+    /* Grab the filename containing the target text */
+    int len = strlen(argv[2]);
+    *filename = (char *)malloc((len + 10) * sizeof(char));
+    if (*filename == NULL)
+    {
+        fprintf(stderr, "Unable to allocate string of size %d\n", len);
+        exit(1);
+    }
+    strncpy(*filename, argv[2], len);
+    // concat "/rank.txt" to the filemame (where rank is the rank of the process)
+    sprintf(*filename + len, "/%d.txt", rank);
+
+    /* Get the number of patterns that the user wants to search for */
+    *nb_patterns = argc - 3;
+
+    /* Fill the pattern array */
+    *pattern = (char **)malloc(*nb_patterns * sizeof(char *));
+    if (*pattern == NULL)
+    {
+        fprintf(stderr,
+                "Unable to allocate array of pattern of size %d\n",
+                *nb_patterns);
+        exit(1);
+    }
+
+    /* Grab the patterns */
+    int i;
+    for (i = 0; i < *nb_patterns; i++)
+    {
+        int l;
+
+        l = strlen(argv[i + 3]);
+        if (l <= 0)
+        {
+            fprintf(stderr, "Error while parsing argument %d\n", i + 3);
+            exit(1);
+        }
+
+        *pattern[i] = (char *)malloc((l + 1) * sizeof(char));
+        if (*pattern[i] == NULL)
+        {
+            fprintf(stderr, "Unable to allocate string of size %d\n", l);
+            exit(1);
+        }
+
+        strncpy(*pattern[i], argv[i + 3], (l + 1));
+    }
+}
+
+int longest_string_len(char **strings, int nb_strings)
+{
+    int i;
+    int max = 0;
+    for (i = 0; i < nb_strings; i++)
+    {
+        int len = strlen(strings[i]);
+        if (len > max)
+            max = len;
+    }
+    return max;
+}
+
 int main(int argc, char **argv)
 {
     char **pattern;
@@ -177,64 +264,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
-    /* Check number of arguments */
-    if (argc < 4)
-    {
-        printf("Usage: %s approximation_factor "
-               "dna_database pattern1 pattern2 ...\n",
-               argv[0]);
-        return 1;
-    }
-
-    /* Get the distance factor */
-    approx_factor = atoi(argv[1]);
-
-    /* Grab the filename containing the target text */
-    int len = strlen(argv[2]);
-    filename = (char *)malloc((len + 10) * sizeof(char));
-    if (filename == NULL)
-    {
-        fprintf(stderr, "Unable to allocate string of size %d\n", len);
-        return 1;
-    }
-    strncpy(filename, argv[2], len);
-    // concat "/rank.txt" to the filemame (where rank is the rank of the process)
-    sprintf(filename + len, "/%d.txt", rank);
-
-    /* Get the number of patterns that the user wants to search for */
-    nb_patterns = argc - 3;
-
-    /* Fill the pattern array */
-    pattern = (char **)malloc(nb_patterns * sizeof(char *));
-    if (pattern == NULL)
-    {
-        fprintf(stderr,
-                "Unable to allocate array of pattern of size %d\n",
-                nb_patterns);
-        return 1;
-    }
-
-    /* Grab the patterns */
-    for (i = 0; i < nb_patterns; i++)
-    {
-        int l;
-
-        l = strlen(argv[i + 3]);
-        if (l <= 0)
-        {
-            fprintf(stderr, "Error while parsing argument %d\n", i + 3);
-            return 1;
-        }
-
-        pattern[i] = (char *)malloc((l + 1) * sizeof(char));
-        if (pattern[i] == NULL)
-        {
-            fprintf(stderr, "Unable to allocate string of size %d\n", l);
-            return 1;
-        }
-
-        strncpy(pattern[i], argv[i + 3], (l + 1));
-    }
+    parse_args(argc, argv, rank, &approx_factor, &filename, &pattern, &nb_patterns);
 
     if (rank == 0)
         printf("Approximate Pattern Mathing: "
@@ -255,10 +285,6 @@ int main(int argc, char **argv)
                 nb_patterns * sizeof(int));
         return 1;
     }
-
-    /*****
-     * BEGIN MAIN LOOP
-     ******/
 
     /* Timer start */
     MPI_Barrier(MPI_COMM_WORLD);
@@ -286,15 +312,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // finds longest pattern
-    int max_pattern_length = 0;
-    for (i = 0; i < nb_patterns; i++)
-    {
-        if (strlen(pattern[i]) > max_pattern_length)
-        {
-            max_pattern_length = strlen(pattern[i]);
-        }
-    }
+    int max_pattern_length = longest_string_len(pattern, nb_patterns);
 
     for (i = 0; i < nb_patterns; i++)
     {
@@ -332,7 +350,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // fill the actual data by recv'ing from other processes
+    // fill the actual data by recieving from other processes
     for (i = 0; i < comm_size; i++)
     {
         int other_start = displs[i];
@@ -355,49 +373,55 @@ int main(int argc, char **argv)
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
     /* Check each pattern one by one */
-    for (i = starti; i < endi; i++)
+#pragma omp parallel private(i, j, n_bytes, nb_patterns, approx_factor, start, end, starti, endi) shared(buf, pattern, n_matches) default(none)
     {
-        int size_pattern = strlen(pattern[i]);
-        int *column;
-
-        column = (int *)malloc((size_pattern + 1) * sizeof(int));
-        if (column == NULL)
+        /* Traverse the patterns */
+#pragma omp for schedule(static)
+        for (i = starti; i < endi; i++)
         {
-            fprintf(stderr, "Error: unable to allocate memory for column (%ldB)\n",
-                    (size_pattern + 1) * sizeof(int));
-            return 1;
-        }
+            int size_pattern = strlen(pattern[i]);
+            int *column;
 
-        /* Traverse the input data up to the end of the file */
-        for (j = start; j < end; j++)
-        {
-            int distance = 0;
-            int size;
+            column = (int *)malloc((size_pattern + 1) * sizeof(int));
+            if (column == NULL)
+            {
+                printf("Error: unable to allocate memory for column (%ldB)\n",
+                       (size_pattern + 1) * sizeof(int));
+                exit(1);
+            }
+
+            /* Traverse the input data up to the end of the file */
+            for (j = start; j < end; j++)
+            {
+                int distance = 0;
+                int size;
 
 #if APM_DEBUG
-            if (j % 100 == 0)
-            {
-                printf("Procesing byte %d (out of %d)\n", j, n_bytes);
-            }
+                if (j % 100 == 0)
+                {
+                    printf("Procesing byte %d (out of %d)\n", j, n_bytes);
+                }
 #endif
 
-            size = size_pattern;
-            if (n_bytes - j < size_pattern)
-            {
-                size = n_bytes - j;
+                size = size_pattern;
+                if (n_bytes - j < size_pattern)
+                {
+                    size = n_bytes - j;
+                }
+
+                distance = levenshtein(pattern[i], &buf[j], size, column);
+
+                if (distance <= approx_factor)
+                {
+#pragma omp atomic
+                    n_matches[i]++;
+                    // printf("Match found at position %d for pattern <%s> (distance: %d)\n",
+                    //        j, pattern[i], distance);
+                }
             }
 
-            distance = levenshtein(pattern[i], &buf[j], size, column);
-
-            if (distance <= approx_factor)
-            {
-                n_matches[i]++;
-                // printf("Match found at position %d for pattern <%s> (distance: %d)\n",
-                //        j, pattern[i], distance);
-            }
+            free(column);
         }
-
-        free(column);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
