@@ -65,7 +65,7 @@ regex_exec_time = re.compile(r"done in ([0-9\.]*) s")
 regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)")
 
 
-test_instances = list(itertools.product(list_len_database, list_nb_pattern, list_len_pattern, list_approximation_factor, list_files_to_open))
+test_instances = list(itertools.product(list_len_database, list_nb_pattern, list_len_pattern, list_approximation_factor, list_files_to_open)) # type: ignore
 
 test_instances = random.sample(test_instances, k=int(sys.argv[1]))
 tested_instances = len(test_instances)
