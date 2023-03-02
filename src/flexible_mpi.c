@@ -14,7 +14,7 @@
 
 #define APM_DEBUG 0
 
-int DISTRIBUTE_PATTERNS;
+int DISTRIBUTE_PATTERNS, ONLY_RANK_0;
 
 int get_env_int(char *var_name, int def)
 {
@@ -121,7 +121,24 @@ int levenshtein(char *s1, char *s2, int len, int *column)
 void fill_data_bounds(int rank, int comm_size, int nb_patterns, int max_pattern_length, int n_bytes, int *start, int *end, int *end_data, int *starti, int *endi)
 {
     int starti_, endi_, start_, end_;
-    if (!DISTRIBUTE_PATTERNS)
+    if (ONLY_RANK_0)
+    {
+        if (rank == 0)
+        {
+            starti_ = 0;
+            endi_ = nb_patterns;
+            start_ = 0;
+            end_ = n_bytes;
+        }
+        else
+        {
+            starti_ = 0;
+            endi_ = 0;
+            start_ = 0;
+            end_ = 0;
+        }
+    }
+    else if (!DISTRIBUTE_PATTERNS)
     {
         starti_ = 0;
         endi_ = nb_patterns;
@@ -273,6 +290,7 @@ int main(int argc, char **argv)
     int rank, comm_size;
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
+    ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
 
 #if APM_DEBUG
     printf("DISTRIBUTE_PATTERNS = %d, argc = %d\n", DISTRIBUTE_PATTERNS, argc);
