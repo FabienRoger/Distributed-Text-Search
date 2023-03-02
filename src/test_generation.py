@@ -10,6 +10,8 @@ from pathlib import Path
 from tqdm import tqdm
 from time import time
 
+random.seed(0)
+
 seq = "apm1"
 to_test = "flexible_mpi"
 
@@ -136,7 +138,7 @@ for (len_database, nb_pattern, len_pattern, approximation_factor, files_to_open)
 print(f"{correct_result} correct result out of {tested_instances}")
 print(f"sequential runtime : {total_runtime_seq:.6f} s")
 print(f"parallel runtime : {total_runtime_to_test:.6f} s")
-print(f"runtime to generate : {runtime_to_generate:.6f} s")
-print(f"runtime to write : {runtime_to_write:.6f} s")
-print(f"runtime to run : {runtime_to_run:.6f} s")
-print(f"runtime to find : {runtime_to_find:.6f} s")
+# print(f"runtime to generate : {runtime_to_generate:.6f} s")
+# print(f"runtime to write : {runtime_to_write:.6f} s")
+# print(f"runtime to run : {runtime_to_run:.6f} s")
+# print(f"runtime to find : {runtime_to_find:.6f} s")

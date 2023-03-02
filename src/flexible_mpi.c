@@ -373,26 +373,24 @@ int main(int argc, char **argv)
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
     /* Check each pattern one by one */
-#pragma omp parallel private(i, j, n_bytes, nb_patterns, approx_factor, start, end, starti, endi) shared(buf, pattern, n_matches) default(none)
+#pragma omp parallel private(i, j) shared(buf, pattern, n_matches, n_bytes, nb_patterns, approx_factor, start, end, starti, endi, max_pattern_length) default(none)
     {
+        int *column;
+        column = (int *)malloc((max_pattern_length + 1) * sizeof(int));
+        if (column == NULL)
+        {
+            printf("Error: unable to allocate memory for column (%ldB)\n",
+                   (max_pattern_length + 1) * sizeof(int));
+            exit(1);
+        }
+#pragma omp for schedule(static) collapse(2)
         /* Traverse the patterns */
-#pragma omp for schedule(static)
         for (i = starti; i < endi; i++)
         {
-            int size_pattern = strlen(pattern[i]);
-            int *column;
-
-            column = (int *)malloc((size_pattern + 1) * sizeof(int));
-            if (column == NULL)
-            {
-                printf("Error: unable to allocate memory for column (%ldB)\n",
-                       (size_pattern + 1) * sizeof(int));
-                exit(1);
-            }
-
             /* Traverse the input data up to the end of the file */
             for (j = start; j < end; j++)
             {
+                int size_pattern = strlen(pattern[i]);
                 int distance = 0;
                 int size;
 
@@ -419,9 +417,8 @@ int main(int argc, char **argv)
                     //        j, pattern[i], distance);
                 }
             }
-
-            free(column);
         }
+        free(column);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
