@@ -14,15 +14,16 @@
 
 #define APM_DEBUG 0
 
-void get_env_var(char *var_name, int def, int *var_value)
+int DISTRIBUTE_PATTERNS;
+
+int get_env_int(char *var_name, int def)
 {
     char *env_var = getenv(var_name);
     if (env_var == NULL)
     {
-        *var_value = def;
-        return;
+        return def;
     }
-    *var_value = atoi(env_var);
+    return atoi(env_var);
 }
 
 char *read_input_file(char *filename, int *size)
@@ -119,44 +120,55 @@ int levenshtein(char *s1, char *s2, int len, int *column)
 
 void fill_data_bounds(int rank, int comm_size, int nb_patterns, int max_pattern_length, int n_bytes, int *start, int *end, int *end_data, int *starti, int *endi)
 {
-    int starti_, endi_, process_in_my_patterns, rank_in_my_pattern;
-    if (comm_size < nb_patterns)
+    int starti_, endi_, start_, end_;
+    if (!DISTRIBUTE_PATTERNS)
     {
-        starti_ = rank * nb_patterns / comm_size;
-        endi_ = (rank + 1) * nb_patterns / comm_size;
-        process_in_my_patterns = 1;
-        rank_in_my_pattern = 0;
+        starti_ = 0;
+        endi_ = nb_patterns;
+        start_ = rank * n_bytes / comm_size;
+        end_ = MIN2((rank + 1) * n_bytes / comm_size, n_bytes);
     }
     else
     {
-        int process_per_pattern = comm_size / nb_patterns;
-        starti_ = rank / process_per_pattern;
-        endi_ = starti_ + 1;
-        process_in_my_patterns = process_per_pattern;
-        rank_in_my_pattern = rank % process_per_pattern;
-        if (starti_ >= nb_patterns)
+        int process_in_my_patterns, rank_in_my_pattern;
+        if (comm_size < nb_patterns)
         {
-            // put in process 0
-            starti_ = 0;
-            endi_ = 1;
-            rank_in_my_pattern += process_per_pattern;
+            starti_ = rank * nb_patterns / comm_size;
+            endi_ = (rank + 1) * nb_patterns / comm_size;
+            process_in_my_patterns = 1;
+            rank_in_my_pattern = 0;
         }
-        if (starti_ == 0)
+        else
         {
-            // leftovers
-            process_in_my_patterns += comm_size - nb_patterns * process_per_pattern;
+            int process_per_pattern = comm_size / nb_patterns;
+            starti_ = rank / process_per_pattern;
+            endi_ = starti_ + 1;
+            process_in_my_patterns = process_per_pattern;
+            rank_in_my_pattern = rank % process_per_pattern;
+            if (starti_ >= nb_patterns)
+            {
+                // put in process 0
+                starti_ = 0;
+                endi_ = 1;
+                rank_in_my_pattern += process_per_pattern;
+            }
+            if (starti_ == 0)
+            {
+                // leftovers
+                process_in_my_patterns += comm_size - nb_patterns * process_per_pattern;
+            }
         }
+
+        start_ = rank_in_my_pattern * n_bytes / process_in_my_patterns;
+        end_ = MIN2((rank_in_my_pattern + 1) * n_bytes / process_in_my_patterns, n_bytes);
     }
 
-    int startj = rank_in_my_pattern * n_bytes / process_in_my_patterns;
-    int endj = MIN2((rank_in_my_pattern + 1) * n_bytes / process_in_my_patterns, n_bytes);
-
     if (start != NULL)
-        *start = startj;
+        *start = start_;
     if (end != NULL)
-        *end = endj;
+        *end = end_;
     if (end_data != NULL)
-        *end_data = MIN2(endj + max_pattern_length, n_bytes);
+        *end_data = MIN2(end_ + max_pattern_length, n_bytes);
     if (starti != NULL)
         *starti = starti_;
     if (endi != NULL)
@@ -220,14 +232,14 @@ void parse_args(int argc, char **argv, int rank, int *approx_factor, char **file
             exit(1);
         }
 
-        *pattern[i] = (char *)malloc((l + 1) * sizeof(char));
-        if (*pattern[i] == NULL)
+        (*pattern)[i] = (char *)malloc((l + 1) * sizeof(char));
+        if ((*pattern)[i] == NULL)
         {
             fprintf(stderr, "Unable to allocate string of size %d\n", l);
             exit(1);
         }
 
-        strncpy(*pattern[i], argv[i + 3], (l + 1));
+        strncpy((*pattern)[i], argv[i + 3], (l + 1));
     }
 }
 
@@ -260,9 +272,20 @@ int main(int argc, char **argv)
     int *n_matches;
     int rank, comm_size;
 
+    DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
+
+#if APM_DEBUG
+    printf("DISTRIBUTE_PATTERNS = %d, argc = %d\n", DISTRIBUTE_PATTERNS, argc);
+#endif
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+
+#if APM_DEBUG
+    if (rank == 0)
+        printf("comm_size = %d", comm_size);
+#endif
 
     parse_args(argc, argv, rank, &approx_factor, &filename, &pattern, &nb_patterns);
 
@@ -369,6 +392,10 @@ int main(int argc, char **argv)
             MPI_Recv(actual_data + s - start, length, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
     }
+
+#if APM_DEBUG
+    printf("Rank %d: start: %d, end: %d, end_data: %d, starti: %d, endi: %d, nb_patterns: %d, n_bytes: %d, max_pattern_length: %d", rank, start, end, end_data, starti, endi, nb_patterns, n_bytes, max_pattern_length);
+#endif
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 

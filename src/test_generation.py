@@ -11,6 +11,7 @@ from tqdm import tqdm
 from time import time
 
 random.seed(0)
+np.random.seed(0)
 
 seq = "apm1"
 to_test = "flexible_mpi"
@@ -18,11 +19,15 @@ to_test = "flexible_mpi"
 print("compiling")
 os.system(f"mpicc -o out/{seq} src/{seq}.c")
 os.system(f"mpicc -fopenmp -o out/{to_test} src/{to_test}.c")
+print("compiling done")
+
 os.system(f"mkdir -p obj")
 # remove obj files
 os.system(f"rm -f obj/*.txt")
 
-cmd = "salloc -N 1 -n 8 mpirun"
+
+
+cmd = "salloc -N 2 -n 8 mpirun"
 
 additional_env_vars = {
     "TEST": "1",
@@ -35,10 +40,13 @@ tmp_dir = base_dir / "obj"
 path_tmp_database = tmp_dir / "0.txt"
 
 if len(sys.argv) < 2:
-    print(f"Usage {sys.argv[0]} N")
+    print(f"Usage {sys.argv[0]} N [params]")
     print(f"\t-N : number of instances to test")
     exit()
 
+for param in sys.argv[2:]:
+    name, value = param.split("=")
+    additional_env_vars[name] = value
 
 chars = list(string.ascii_uppercase)
 def generate_random_string(length, nb=1):
@@ -51,7 +59,7 @@ def generate_random_string(length, nb=1):
         return res
 
 
-param = "large_pattern_large_file"
+param = "many_pattern_large_files"
 
 if param == "diverse":
     list_len_database = list(range(20, 200, 20)) + list(range(200, 2_000, 200)) + list(range(2_000, 10_000, 2_000)) + list(range(10_000, 100_000, 10_000)) + [500_000, 1_000_000]
@@ -59,13 +67,18 @@ if param == "diverse":
     list_len_pattern = [10, 20]
     list_approximation_factor = [0, 1, 4]
     list_files_to_open = [1, 2]
-if param == "large_pattern_large_file":
+elif param == "large_pattern_large_file":
     list_len_database = [10000]
-    list_nb_pattern = [1]
+    list_nb_pattern = [2]
     list_len_pattern = [20, 50]
     list_approximation_factor = [0, 1, 4]
     list_files_to_open = [8]
-
+elif param == "many_pattern_large_files":
+    list_len_database = [1000]
+    list_nb_pattern = list(range(20, 200, 20))
+    list_len_pattern = [20, 30]
+    list_approximation_factor = [0, 1]
+    list_files_to_open = [2, 4]
 
 regex_exec_time = re.compile(r"done in ([0-9\.]*) s")
 regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)")
