@@ -1,13 +1,7 @@
 #!/bin/bash
 
 
-mpicc -o out/apm1 src/apm1.c -Wall;
-mpicc -o out/apm2 src/apm2.c -Wall;
-mpicc -o out/apm4 src/apm4.c -Wall;
-./apm 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
-salloc -N 1 -n 1 mpirun out/apm1 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
-salloc -N 1 -n 1 mpirun out/apm2 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
-salloc -N 1 -n 1 mpirun out/apm4 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
-salloc -N 1 -n 4 mpirun out/apm1 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
-salloc -N 1 -n 4 mpirun out/apm2 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
-salloc -N 1 -n 4 mpirun out/apm4 1 dna/large GGCCAGGGGCACGTGGAAGAAGCTATCGTGGCAAAGGGAGCAGTCATATC;
+mpicc -c src/flexible_mpi.c -o out/flexible_mpi
+nvcc -I. -c src/flexible_mpi.cu -o out/flexible_mpi_cu
+mpicc out/flexible_mpi out/flexible_mpi_cu -lcudart -L/usr/local/cuda/lib64 -o out/flexible_exec
+salloc -N 2 -n 8 mpirun out/flexible_exec 1 obj ABC

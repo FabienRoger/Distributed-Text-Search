@@ -16,6 +16,8 @@
 
 int DISTRIBUTE_PATTERNS, ONLY_RANK_0;
 
+int sum_all(int *a, int n);
+
 int get_env_int(char *var_name, int def)
 {
     char *env_var = getenv(var_name);
@@ -300,6 +302,16 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
+    // int *a = (int *)malloc(100 * sizeof(int));
+    // for (i = 0; i < 100; i++)
+    // {
+    //     a[i] = i;
+    // }
+    // int r = sum_all(a, 100);
+    // printf("rank = %d, sum = %d", rank, r);
+    // MPI_Finalize();
+    // return 0;
+
 #if APM_DEBUG
     if (rank == 0)
         printf("comm_size = %d", comm_size);
@@ -438,13 +450,6 @@ int main(int argc, char **argv)
                 int size_pattern = strlen(pattern[i]);
                 int distance = 0;
                 int size;
-
-#if APM_DEBUG
-                if (j % 100 == 0)
-                {
-                    printf("Procesing byte %d (out of %d)\n", j, n_bytes);
-                }
-#endif
 
                 size = size_pattern;
                 if (n_bytes - j < size_pattern)
