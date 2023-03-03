@@ -18,9 +18,10 @@ to_test = "flexible_mpi"  # .c and .cu should exist
 
 print("compiling")
 os.system(f"mpicc -o out/{seq} src/{seq}.c")
+
 os.system(f"mpicc -fopenmp -o out/{to_test} -c src/{to_test}.c")
 os.system(f"nvcc -I. -o out/{to_test}_cu -c src/{to_test}.cu")
-os.system(f"mpicc out/{to_test} out/{to_test}_cu -lcudart -L/usr/local/cuda/lib64 -o out/{to_test}_exec")
+os.system(f"mpicc -fopenmp out/{to_test} out/{to_test}_cu -lcudart -L/usr/local/cuda/lib64 -o out/{to_test}_exec")
 print("compiling done")
 
 os.system(f"mkdir -p obj")

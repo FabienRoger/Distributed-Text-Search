@@ -14,9 +14,11 @@
 
 #define APM_DEBUG 0
 
-int DISTRIBUTE_PATTERNS, ONLY_RANK_0;
+int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU;
 
 int sum_all(int *a, int n);
+
+void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches);
 
 int get_env_int(char *var_name, int def)
 {
@@ -293,6 +295,7 @@ int main(int argc, char **argv)
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
+    USE_GPU = get_env_int("USE_GPU", 0);
 
 #if APM_DEBUG
     printf("DISTRIBUTE_PATTERNS = %d, argc = %d\n", DISTRIBUTE_PATTERNS, argc);
@@ -429,44 +432,52 @@ int main(int argc, char **argv)
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
-#pragma omp parallel private(i, j) shared(buf, pattern, n_matches, n_bytes, approx_factor, start, end, starti, endi, max_pattern_length) default(none)
+    if (USE_GPU)
     {
-        /* Allocate compute buffer */
-        int *column;
-        column = (int *)malloc((max_pattern_length + 1) * sizeof(int));
-        if (column == NULL)
+        compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
+    }
+    else
+    {
+
+#pragma omp parallel private(i, j) shared(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches) default(none)
         {
-            printf("Error: unable to allocate memory for column (%ldB)\n",
-                   (max_pattern_length + 1) * sizeof(int));
-            exit(1);
-        }
-#pragma omp for schedule(static) collapse(2)
-        /* Traverse the patterns */
-        for (i = starti; i < endi; i++)
-        {
-            /* Traverse the input data up to the end of the file */
-            for (j = start; j < end; j++)
+            /* Allocate compute buffer */
+            int *column;
+            column = (int *)malloc((max_pattern_length + 1) * sizeof(int));
+            if (column == NULL)
             {
-                int size_pattern = strlen(pattern[i]);
-                int distance = 0;
-                int size;
-
-                size = size_pattern;
-                if (n_bytes - j < size_pattern)
+                printf("Error: unable to allocate memory for column (%ldB)\n",
+                       (max_pattern_length + 1) * sizeof(int));
+                exit(1);
+            }
+#pragma omp for schedule(static) collapse(2)
+            /* Traverse the patterns */
+            for (i = starti; i < endi; i++)
+            {
+                /* Traverse the input data up to the end of the file */
+                for (j = start; j < end; j++)
                 {
-                    size = n_bytes - j;
-                }
+                    int size_pattern = strlen(pattern[i]);
+                    int distance = 0;
+                    int size;
 
-                distance = levenshtein(pattern[i], &buf[j], size, column);
+                    size = size_pattern;
+                    if (n_bytes - j < size_pattern)
+                    {
+                        size = n_bytes - j;
+                    }
 
-                if (distance <= approx_factor)
-                {
+                    distance = levenshtein(pattern[i], &buf[j], size, column);
+
+                    if (distance <= approx_factor)
+                    {
 #pragma omp atomic
-                    n_matches[i]++;
+                        n_matches[i]++;
+                    }
                 }
             }
+            free(column);
         }
-        free(column);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
