@@ -463,8 +463,6 @@ int main(int argc, char **argv)
                 {
 #pragma omp atomic
                     n_matches[i]++;
-                    // printf("Match found at position %d for pattern <%s> (distance: %d)\n",
-                    //        j, pattern[i], distance);
                 }
             }
         }
