@@ -429,9 +429,9 @@ int main(int argc, char **argv)
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
-    /* Check each pattern one by one */
-#pragma omp parallel private(i, j) shared(buf, pattern, n_matches, n_bytes, nb_patterns, approx_factor, start, end, starti, endi, max_pattern_length) default(none)
+#pragma omp parallel private(i, j) shared(buf, pattern, n_matches, n_bytes, approx_factor, start, end, starti, endi, max_pattern_length) default(none)
     {
+        /* Allocate compute buffer */
         int *column;
         column = (int *)malloc((max_pattern_length + 1) * sizeof(int));
         if (column == NULL)
