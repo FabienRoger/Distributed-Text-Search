@@ -86,7 +86,7 @@ elif param == "large_pattern_large_file":
 elif param == "many_pattern_large_files":
     list_len_database = [1000]
     list_nb_pattern = list(range(20, 200, 20))
-    list_len_pattern = [20, 30]
+    list_len_pattern = [12, 15]
     list_approximation_factor = [0, 1]
     list_files_to_open = [2, 4]
 

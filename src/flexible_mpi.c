@@ -14,6 +14,9 @@
 
 #define APM_DEBUG 0
 
+// TODO: make this smarter
+#define MAX_PATTERN_LENGTH_GPU 16
+
 int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU;
 
 int sum_all(int *a, int n);
@@ -432,7 +435,7 @@ int main(int argc, char **argv)
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
-    if (USE_GPU)
+    if (USE_GPU && max_pattern_length <= MAX_PATTERN_LENGTH_GPU)
     {
         compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
     }
