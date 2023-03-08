@@ -14,6 +14,8 @@
 
 #define APM_DEBUG 0
 
+#define HOST_NAME_MAX_LEN 1024
+
 int MAX_PATTERN_LENGTH_GPU;
 
 int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU;
@@ -294,6 +296,7 @@ int main(int argc, char **argv)
     char *own_buf;
     int *n_matches;
     int rank, comm_size;
+    char **rank_to_hostname; // This allow only one thread to acces the gpu on each machine
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
@@ -434,7 +437,56 @@ int main(int argc, char **argv)
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
-    if (USE_GPU && max_pattern_length <= MAX_PATTERN_LENGTH_GPU)
+    int is_gpu_already_used = 0;
+    // If we are supposed to use GPU, we check that no other thread uses this particular gpu
+    if (USE_GPU){
+        if (rank == 0){
+            int thread_rank;
+            rank_to_hostname = (char **)malloc(comm_size * sizeof(char*));
+            for (thread_rank = 0; thread_rank < comm_size; thread_rank++){
+                rank_to_hostname[thread_rank] = (char *)malloc((HOST_NAME_MAX_LEN + 1) * sizeof(char));
+                memset(rank_to_hostname[thread_rank], 0, HOST_NAME_MAX_LEN + 1);
+            }
+            for (thread_rank = 0; thread_rank < comm_size; thread_rank++){
+                // Wait for hostname to be received
+                MPI_Recv(rank_to_hostname[thread_rank], HOST_NAME_MAX_LEN + 1, MPI_CHAR, thread_rank, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+                // Check if this gpu is already used
+                int hostname_already_received = 0;
+                int j;
+                for (j = 0; j < comm_size; j++){
+                    if (j == thread_rank){
+                        continue;
+                    }
+                    if (! strcmp(rank_to_hostname[thread_rank], rank_to_hostname[j])){
+                        hostname_already_received = 1;
+                        break;
+                    }
+                }
+
+                // Send if this thread should use the gpu
+                MPI_Isend(&hostname_already_received, 1, MPI_INT, thread_rank, 2, MPI_COMM_WORLD, &req);
+            }
+        }
+        else{
+            char hostname[HOST_NAME_MAX_LEN + 1];
+
+            hostname[HOST_NAME_MAX_LEN] = 0;
+            
+            // find hostname
+            if (gethostname(hostname, HOST_NAME_MAX_LEN) != 0){
+                perror("gethostname");
+            }
+
+            // Send hostname
+            MPI_Isend(hostname, HOST_NAME_MAX_LEN + 1, MPI_CHAR, 0, 1, MPI_COMM_WORLD, &req);
+
+            // Receive if we should use the gpu on this thread
+            MPI_Recv(&is_gpu_already_used, 1, MPI_INT, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+    }
+
+    if ((! is_gpu_already_used) && USE_GPU && max_pattern_length <= MAX_PATTERN_LENGTH_GPU)
     {
         compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
     }
