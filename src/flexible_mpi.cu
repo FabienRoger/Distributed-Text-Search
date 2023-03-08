@@ -79,7 +79,7 @@ int required_mem(int length)
     return (length + 1) * sizeof(int);
 }
 
-extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **patterns, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches)
+extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **patterns, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches, int end_data)
 {
 
     if (gpu_initialized == 0)
@@ -103,9 +103,9 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
     int *d_n_matches;
 
     cudaSetDevice(0);
-    cudaMalloc((void **)&d_buf, sizeof(char) * n_bytes);
+    cudaMalloc((void **)&d_buf, sizeof(char) * (end_data - start));
     cudaMalloc((void **)&d_n_matches, sizeof(int) * endi);
-    cudaMemcpy(d_buf, buf, sizeof(char) * n_bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_buf, buf, sizeof(char) * (end_data - start), cudaMemcpyHostToDevice);
     cudaMemcpy(d_n_matches, n_matches, sizeof(int) * endi, cudaMemcpyHostToDevice);
 
     /* Traverse the patterns */
