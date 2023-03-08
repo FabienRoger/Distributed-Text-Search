@@ -171,7 +171,10 @@ void fill_data_bounds(int rank, int comm_size, int nb_patterns, int max_pattern_
                 // put in process 0
                 starti_ = 0;
                 endi_ = 1;
-                rank_in_my_pattern += process_per_pattern;
+
+                rank_in_my_pattern = (rank - nb_patterns * process_per_pattern // my number above the max pattern
+                                      + process_per_pattern                    // processes already in pattern 0
+                );
             }
             if (starti_ == 0)
             {
@@ -189,7 +192,7 @@ void fill_data_bounds(int rank, int comm_size, int nb_patterns, int max_pattern_
     if (end != NULL)
         *end = end_;
     if (end_data != NULL)
-        *end_data = MIN2(end_ + max_pattern_length, n_bytes);
+        *end_data = MIN2(end_ + max_pattern_length + 1, n_bytes);
     if (starti != NULL)
         *starti = starti_;
     if (endi != NULL)
@@ -298,10 +301,6 @@ int main(int argc, char **argv)
     USE_GPU = get_env_int("USE_GPU", 0);
     THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
     BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
-
-#if APM_DEBUG
-    printf("DISTRIBUTE_PATTERNS = %d, argc = %d\n", DISTRIBUTE_PATTERNS, argc);
-#endif
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -419,7 +418,7 @@ int main(int argc, char **argv)
     }
 
 #if APM_DEBUG
-    printf("Rank %d: start: %d, end: %d, end_data: %d, starti: %d, endi: %d, nb_patterns: %d, n_bytes: %d, max_pattern_length: %d", rank, start, end, end_data, starti, endi, nb_patterns, n_bytes, max_pattern_length);
+    printf("Rank %d: start: %d, end: %d, end_data: %d, starti: %d, endi: %d, nb_patterns: %d, n_bytes: %d, max_pattern_length: %d\n", rank, start, end, end_data, starti, endi, nb_patterns, n_bytes, max_pattern_length);
 #endif
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data

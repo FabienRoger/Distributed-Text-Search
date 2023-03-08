@@ -60,7 +60,8 @@ def generate_random_string(length, nb=1):
         return "".join(random_chars)
     else:
         random_chars = np.random.choice(chars, size=(nb, length))
-        res = ["".join(random_chars[i]) for i in range(len(random_chars))]
+        lengths = np.random.randint(1, length, size=nb)
+        res = ["".join(random_chars[i, : lengths[i]]) for i in range(len(random_chars))]
         return res
 
 
