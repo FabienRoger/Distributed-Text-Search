@@ -16,7 +16,7 @@
 
 int DISTRIBUTE_PATTERNS, ONLY_RANK_0, THREAD_PER_BLOCK, BLOCK_PER_GRID, PERCENTAGE_GPU;
 
-void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches);
+void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches, int end_data);
 
 int big_enough_gpu_available(int max_pattern_length);
 
@@ -296,13 +296,16 @@ int main(int argc, char **argv)
     int own_n_bytes;
     char *own_buf;
     int *n_matches;
+    int *n_matches_gpu;
+    int *n_matches_openmp;
     int rank, comm_size;
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
-    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 50);
+    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 100);
     THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
     BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
+    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 20);
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -329,6 +332,22 @@ int main(int argc, char **argv)
     /* Allocate the array of matches */
     n_matches = (int *)malloc(nb_patterns * sizeof(int));
     if (n_matches == NULL)
+    {
+        fprintf(stderr, "Error: unable to allocate memory for %ldB\n",
+                nb_patterns * sizeof(int));
+        return 1;
+    }
+
+    n_matches_gpu = (int *)malloc(nb_patterns * sizeof(int));
+    if (n_matches_gpu == NULL)
+    {
+        fprintf(stderr, "Error: unable to allocate memory for %ldB\n",
+                nb_patterns * sizeof(int));
+        return 1;
+    }
+
+    n_matches_openmp = (int *)malloc(nb_patterns * sizeof(int));
+    if (n_matches_openmp == NULL)
     {
         fprintf(stderr, "Error: unable to allocate memory for %ldB\n",
                 nb_patterns * sizeof(int));
@@ -366,6 +385,8 @@ int main(int argc, char **argv)
     for (i = 0; i < nb_patterns; i++)
     {
         n_matches[i] = 0;
+        n_matches_gpu[i] = 0;
+        n_matches_openmp[i] = 0;
     }
 
     // send data to people who need it asynchronically
@@ -424,62 +445,68 @@ int main(int argc, char **argv)
 #endif
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
-    if (PERCENTAGE_GPU && big_enough_gpu_available(max_pattern_length))
+    if (!big_enough_gpu_available(max_pattern_length))
     {
-        compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
+        PERCENTAGE_GPU = 0;
     }
-    else
-    {
+    int start_gpu = start;
+    int end_gpu = start + ((end - start) * PERCENTAGE_GPU) / 100;
+    int end_data_gpu = MIN2(end_gpu + max_pattern_length + 1, n_bytes);
+    int start_openmp = end_gpu;
+    int end_openmp = end;
+    int end_data_openmp = end_data;
+    printf("start : %d, end : %d, start_openmp : %d, end_openmp : %d\n", start, end, start_openmp, end_openmp);
+    compute_matches_gpu(buf, start_gpu, end_gpu, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches_gpu, end_data);
 
-#pragma omp parallel private(i, j) shared(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches) default(none)
+#pragma omp parallel private(i, j) shared(buf, start_openmp, end_openmp, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches, n_matches_openmp) default(none)
+    {
+        /* Allocate compute buffer */
+        int *column;
+        column = (int *)malloc((max_pattern_length + 1) * sizeof(int));
+        if (column == NULL)
         {
-            /* Allocate compute buffer */
-            int *column;
-            column = (int *)malloc((max_pattern_length + 1) * sizeof(int));
-            if (column == NULL)
-            {
-                printf("Error: unable to allocate memory for column (%ldB)\n",
-                       (max_pattern_length + 1) * sizeof(int));
-                exit(1);
-            }
-            int *local_n_matches_ = (int *)malloc((endi - starti) * sizeof(int));
-            int *local_n_matches = local_n_matches_ - starti;
+            printf("Error: unable to allocate memory for column (%ldB)\n",
+                   (max_pattern_length + 1) * sizeof(int));
+            exit(1);
+        }
+        int *local_n_matches_ = (int *)malloc((endi - starti) * sizeof(int));
+        memset(local_n_matches_, 0, (endi - starti) * sizeof(int));
+        int *local_n_matches = local_n_matches_ - starti;
 
 #pragma omp for schedule(dynamic) collapse(2)
-            /* Traverse the patterns */
-            for (i = starti; i < endi; i++)
+        /* Traverse the patterns */
+        for (i = starti; i < endi; i++)
+        {
+            /* Traverse the input data up to the end of the file */
+            for (j = start_openmp; j < end_openmp; j++)
             {
-                /* Traverse the input data up to the end of the file */
-                for (j = start; j < end; j++)
+                int size_pattern = strlen(pattern[i]);
+                int distance = 0;
+                int size;
+
+                size = size_pattern;
+                if (n_bytes - j < size_pattern)
                 {
-                    int size_pattern = strlen(pattern[i]);
-                    int distance = 0;
-                    int size;
+                    size = n_bytes - j;
+                }
 
-                    size = size_pattern;
-                    if (n_bytes - j < size_pattern)
-                    {
-                        size = n_bytes - j;
-                    }
+                distance = levenshtein(pattern[i], &buf[j], size, column);
 
-                    distance = levenshtein(pattern[i], &buf[j], size, column);
-
-                    if (distance <= approx_factor)
-                    {
-                        local_n_matches[i]++;
-                    }
+                if (distance <= approx_factor)
+                {
+                    local_n_matches[i]++;
                 }
             }
-
-            for (i = starti; i < endi; i++)
-            {
-#pragma omp atomic
-                n_matches[i] += local_n_matches[i];
-            }
-
-            free(local_n_matches_);
-            free(column);
         }
+
+        for (i = starti; i < endi; i++)
+        {
+#pragma omp atomic
+            n_matches_openmp[i] += local_n_matches[i];
+        }
+
+        free(local_n_matches_);
+        free(column);
     }
 
     sync_gpu();
@@ -487,9 +514,12 @@ int main(int argc, char **argv)
     // reduce the number of matches
     for (i = 0; i < nb_patterns; i++)
     {
-        int tmp;
-        MPI_Reduce(&n_matches[i], &tmp, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-        n_matches[i] = tmp;
+        int tmp_openmp;
+        int tmp_gpu;
+        printf("n_matches_gpu[%d] : %d\n", i, n_matches_gpu[i]);
+        MPI_Reduce(&n_matches_openmp[i], &tmp_openmp, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Reduce(&n_matches_gpu[i], &tmp_gpu, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        n_matches[i] = tmp_openmp + tmp_gpu;
     }
 
     /* Timer stop */
