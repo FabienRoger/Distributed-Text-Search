@@ -487,11 +487,18 @@ int main(int argc, char **argv)
     if (rank == 0)
     {
         printf("%s done in %lf s (size ; %d)\n\n", argv[0], duration, comm_size);
+        int sum = 0;
+        int xor = 0;
         for (i = 0; i < nb_patterns; i++)
         {
+            sum += n_matches[i];
+            xor ^= n_matches[i];
             printf("Number of matches for pattern <%s>: %d\n",
                    pattern[i], n_matches[i]);
         }
+#if APM_DEBUG
+        printf("Total number of matches: %d, xor: %d\n", sum, xor);
+#endif
     }
 
     MPI_Finalize();

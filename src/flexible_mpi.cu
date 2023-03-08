@@ -4,6 +4,7 @@
 
 #define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
 #define MIN2(a, b) (a < b ? a : b)
+#define MAX2(a, b) (a > b ? a : b)
 
 // mem limited to ~40kB per block -> 256 x len < 40kB, len < 128!
 
@@ -39,7 +40,7 @@ __device__ int levenshtein(char *s1, char *s2, int len, int *column)
 __global__ void compute_matches_kernel(char *buf, int start, int end, int n_bytes, int length, char *pattern, int approx_factor, int *n_matches, int max_pattern_length)
 {
     extern __shared__ int column[];
-    int *my_column = &column[threadIdx.x * max_pattern_length];
+    int *my_column = &column[threadIdx.x * (max_pattern_length + 1)];
     int j;
     int skip_size = blockDim.x * gridDim.x;
     for (j = start + blockIdx.x * blockDim.x + threadIdx.x; j < end; j += skip_size)
@@ -71,6 +72,11 @@ void initialize_gpu()
     MAX_THREAD_PER_BLOCK = MIN2(prop.maxThreadsPerBlock, THREAD_PER_BLOCK);
     MAX_SHARED_MEMORY_PER_BLOCK = prop.sharedMemPerBlock;
     gpu_initialized = 1;
+}
+
+int required_mem(int length)
+{
+    return (length + 1) * sizeof(int);
 }
 
 extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **patterns, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches)
@@ -111,9 +117,11 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
         cudaMalloc((void **)&d_pattern, sizeof(char) * length);
         cudaMemcpy(d_pattern, pattern, sizeof(char) * length, cudaMemcpyHostToDevice);
 
-        int mem_per_thread = (length + 1) * sizeof(int);
+        int mem_per_thread = required_mem(length);
         int block_size = MIN2(MAX_SHARED_MEMORY_PER_BLOCK / mem_per_thread, MAX_THREAD_PER_BLOCK);
+        block_size = MAX2(1, block_size);
         int num_blocks = MIN2((end - start + block_size - 1) / block_size, MAX_BLOCK_PER_GRID);
+        num_blocks = MAX2(1, num_blocks);
 
         compute_matches_kernel<<<num_blocks, block_size, block_size * mem_per_thread>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i, length);
 
@@ -142,7 +150,7 @@ extern "C" int big_enough_gpu_available(int max_pattern_length)
         initialize_gpu();
     }
 
-    int required_shared_memory = max_pattern_length * MAX_THREAD_PER_BLOCK * sizeof(int);
+    int required_shared_memory = required_mem(max_pattern_length);
 
     return required_shared_memory < MAX_SHARED_MEMORY_PER_BLOCK;
 }
