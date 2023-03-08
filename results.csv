@@ -1,0 +1,19 @@
+scenario,setting,exec_time
+large files 1 large patterns,no mpi,7.0583
+large files 1 large patterns,pattern parallel,0.9563
+large files 1 large patterns,pattern distributed,1.3193
+large files 1 large patterns,no omp no gpu,1.0189
+large files 1 large patterns,only omp,0.9732
+large files 1 large patterns,only gpu,0.8168
+large files 100 small patterns,no mpi,7.3054
+large files 100 small patterns,pattern parallel,0.9358
+large files 100 small patterns,pattern distributed,0.9881
+large files 100 small patterns,no omp no gpu,1.0048
+large files 100 small patterns,only omp,1.0308
+large files 100 small patterns,only gpu,0.8554
+small files 10 large patterns,no mpi,6.9288
+small files 10 large patterns,pattern parallel,1.1342
+small files 10 large patterns,pattern distributed,0.9871
+small files 10 large patterns,no omp no gpu,1.0041
+small files 10 large patterns,only omp,0.9864
+small files 10 large patterns,only gpu,0.9108

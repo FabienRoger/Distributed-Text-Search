@@ -13,6 +13,22 @@ add autonatic decisions
 do graph of our decision tree
 do slides
 
+4 refs -
+large files 1 large pattern
+large files 100 small patterns
+small files 100 large pattern
+small files 10000 small patterns
+
+barplot in 4 refs
+default vs only rank 0 vs only omp vs only gpu vs only rank 0 and no omp and no gpu vs distributed or not
+
+perfs vs percentage (lines)
+
+perfs vs threads vs blocks (heatmap)
+
+how it scales:
+perfs vs nb of machines
+
 ROAD MAP:
 
 - On commence par uniquement du static dispatching

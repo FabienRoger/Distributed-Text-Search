@@ -302,7 +302,7 @@ int main(int argc, char **argv)
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
-    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 100);
+    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 20);
     THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
     BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
     PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 20);
