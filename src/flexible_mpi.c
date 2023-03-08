@@ -282,6 +282,11 @@ int longest_string_len(char **strings, int nb_strings)
     return max;
 }
 
+double get_duration(struct timeval t1, struct timeval t2)
+{
+    return (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) / 1e6;
+}
+
 int main(int argc, char **argv)
 {
     char **pattern;
@@ -290,7 +295,7 @@ int main(int argc, char **argv)
     int nb_patterns = 0;
     int i, j;
     char *buf;
-    struct timeval t1, t2;
+    struct timeval t1, t2, t3, t4;
     double duration;
     int n_bytes;
     int own_n_bytes;
@@ -305,7 +310,6 @@ int main(int argc, char **argv)
     PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 20);
     THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
     BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
-    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 20);
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -444,6 +448,8 @@ int main(int argc, char **argv)
     printf("Rank %d: start: %d, end: %d, end_data: %d, starti: %d, endi: %d, nb_patterns: %d, n_bytes: %d, max_pattern_length: %d\n", rank, start, end, end_data, starti, endi, nb_patterns, n_bytes, max_pattern_length);
 #endif
 
+    gettimeofday(&t2, NULL);
+
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
     if (!big_enough_gpu_available(max_pattern_length))
     {
@@ -458,7 +464,7 @@ int main(int argc, char **argv)
     printf("start : %d, end : %d, start_openmp : %d, end_openmp : %d\n", start, end, start_openmp, end_openmp);
     compute_matches_gpu(buf, start_gpu, end_gpu, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches_gpu, end_data);
 
-#pragma omp parallel private(i, j) shared(buf, start_openmp, end_openmp, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches, n_matches_openmp) default(none)
+#pragma omp parallel private(i, j) shared(buf, start_openmp, end_openmp, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches_openmp) default(none)
     {
         /* Allocate compute buffer */
         int *column;
@@ -473,7 +479,7 @@ int main(int argc, char **argv)
         memset(local_n_matches_, 0, (endi - starti) * sizeof(int));
         int *local_n_matches = local_n_matches_ - starti;
 
-#pragma omp for schedule(dynamic) collapse(2)
+#pragma omp for schedule(static) collapse(2)
         /* Traverse the patterns */
         for (i = starti; i < endi; i++)
         {
@@ -511,25 +517,27 @@ int main(int argc, char **argv)
 
     sync_gpu();
     MPI_Barrier(MPI_COMM_WORLD);
+    gettimeofday(&t3, NULL);
     // reduce the number of matches
     for (i = 0; i < nb_patterns; i++)
     {
         int tmp_openmp;
         int tmp_gpu;
+#if APM_DEBUG
         printf("n_matches_gpu[%d] : %d\n", i, n_matches_gpu[i]);
+#endif
         MPI_Reduce(&n_matches_openmp[i], &tmp_openmp, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
         MPI_Reduce(&n_matches_gpu[i], &tmp_gpu, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
         n_matches[i] = tmp_openmp + tmp_gpu;
     }
 
     /* Timer stop */
-    gettimeofday(&t2, NULL);
-
-    duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+    gettimeofday(&t4, NULL);
 
     if (rank == 0)
     {
-        printf("%s done in %lf s (size ; %d)\n\n", argv[0], duration, comm_size);
+        printf("%s done in %lf s: %lf s transmitting, %lf s computing, %lf s gathering (size ; %d)\n\n",
+               argv[0], get_duration(t1, t4), get_duration(t1, t2), get_duration(t2, t3), get_duration(t3, t4), comm_size);
         int sum = 0;
         int xor = 0;
         for (i = 0; i < nb_patterns; i++)

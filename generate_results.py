@@ -57,12 +57,13 @@ scenarios = {
 }
 
 settings = {
-    "no mpi": {"ONLY_RANK_0": 1},
-    "pattern parallel": {"DISTRIBUTE_PATTERNS": 0},
+    "pattern not distributed": {"DISTRIBUTE_PATTERNS": 0},
     "pattern distributed": {"DISTRIBUTE_PATTERNS": 1},
-    "no omp no gpu": {"OMP_NUM_THREADS": 1, "PERCENTAGE_GPU": 0},
-    "only omp": {"PERCENTAGE_GPU": 0},
-    "only gpu": {"PERCENTAGE_GPU": 100},
+    "mpi + gpu": {"PERCENTAGE_GPU": 100},
+    "only mpi": {"OMP_NUM_THREADS": 1, "PERCENTAGE_GPU": 0},
+    "only omp": {"ONLY_RANK_0": 1,"OMP_NUM_THREADS": 8, "PERCENTAGE_GPU": 0},
+    "only gpu": {"ONLY_RANK_0": 1, "PERCENTAGE_GPU": 100},
+    "no parallelism": {"ONLY_RANK_0": 1, "OMP_NUM_THREADS": 1, "PERCENTAGE_GPU": 0},
 }
 
 
@@ -75,19 +76,24 @@ def measure_runtime(
     approximation_factor,
     files_to_open,
     nodes=8,
+    mpi_processes_per_node = 8,
 ):
 
-    additional_env_vars = {k: str(v) for k, v in additional_env_vars.items()}
 
     random.seed(0)
     np.random.seed(0)
+    
+    # if "OMP_NUM_THREADS" in additional_env_vars and additional_env_vars["OMP_NUM_THREADS"] > 1:
+    #     mpi_processes_per_node = 1
+    
+    cmd = f"salloc -N {nodes} -n {nodes * mpi_processes_per_node} mpirun"
+    
+    additional_env_vars = {k: str(v) for k, v in additional_env_vars.items()}
 
-    cmd = f"salloc -N {nodes} -n {nodes * 8} mpirun"
-
-    regex_exec_time = re.compile(r"done in ([0-9\.]*) s")
+    regex_exec_time = re.compile(r"done in ([0-9\.]*) s: ([0-9\.]*) s transmitting, ([0-9\.]*) s computing, ([0-9\.]*) s gathering")
     regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)")
 
-    total_runtime_to_test = 0
+    total_runtimes = [0] * 4
     runtime_to_generate = 0
     runtime_to_write = 0
     runtime_to_run = 0
@@ -128,37 +134,38 @@ def measure_runtime(
         st = time()
 
         def get_results(output):
-            exec_time = float(re.findall(regex_exec_time, output)[0])
+            exec_times = [float(f) for f in re.findall(regex_exec_time, output)[0]]
             raw_result = re.findall(regex_matches, output)
             dic_result = {pattern: nbMatches for (pattern, nbMatches) in raw_result}
-            return exec_time, dic_result
+            return exec_times, dic_result
 
-        parallel_time, parallel_dic_result = get_results(output_to_test)
+        parallel_times, parallel_dic_result = get_results(output_to_test)
 
-        total_runtime_to_test += parallel_time
+        for i, t in enumerate(parallel_times):
+            total_runtimes[i] += t
 
         runtime_to_find += time() - st
 
-    return total_runtime_to_test
+    return total_runtimes
 
 
 # creae results file
 with open("results.csv", "w") as f:
-    f.write("scenario,setting,exec_time\n")
+    f.write("scenario,setting,exec_time,transmit_time,compute_time,gather_time\n")
 
     for scenario_name, scenario in scenarios.items():
         print(f"Running scenario {scenario_name}")
 
         for setting_name, setting in settings.items():
             print(f"Running setting {setting_name}")
-            total_runtime_to_test = measure_runtime(
+            runtime, transmit, compute, gather = measure_runtime(
                 5,
                 setting,
                 *scenario,
             )
-            print(f"Total runtime {total_runtime_to_test:.2f} s")
+            print(f"Total runtime {runtime:.2f} s")
 
-            f.write(f"{scenario_name},{setting_name},{total_runtime_to_test:.4f}\n")
+            f.write(f"{scenario_name},{setting_name},{runtime:.2f},{transmit:.2f},{compute:.2f},{gather:.2f}\n")
 
             print()
 
