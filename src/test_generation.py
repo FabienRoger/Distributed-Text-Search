@@ -64,16 +64,10 @@ def generate_random_string(length, nb=1):
         return res
 
 
-param = "large_pattern_large_file"
+param = "diverse"
 
 if param == "diverse":
-    list_len_database = (
-        list(range(20, 200, 20))
-        + list(range(200, 2_000, 200))
-        + list(range(2_000, 10_000, 2_000))
-        + list(range(10_000, 100_000, 10_000))
-        + [500_000, 1_000_000]
-    )
+    list_len_database = list(range(20, 200, 20)) + list(range(200, 2_000, 200)) + list(range(2_000, 10_000, 2_000))
     list_nb_pattern = list(range(1, 20)) + list(range(20, 200, 20)) + list(range(200, 2_000, 200))
     list_len_pattern = [10, 20]
     list_approximation_factor = [0, 1, 4]
@@ -112,6 +106,7 @@ runtime_to_find = 0
 print(f"testing {exec_to_test} relative to {exec_seq}")
 
 it = tqdm(test_instances)
+
 for (len_database, nb_pattern, len_pattern, approximation_factor, files_to_open) in it:
     it.set_postfix(
         {
@@ -145,10 +140,16 @@ for (len_database, nb_pattern, len_pattern, approximation_factor, files_to_open)
     command_to_test = f"{cmd} {exec_to_test} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
     command_seq = f"{cmd} {exec_seq} {approximation_factor} {tmp_dir} {' '.join(patterns)}"
 
-    output_to_test = subprocess.check_output(
-        command_to_test.split(), env=dict(os.environ, **additional_env_vars)
-    ).decode()
     output_seq = subprocess.check_output(command_seq.split()).decode()
+    try:
+        output_to_test = subprocess.check_output(
+            command_to_test.split(), env=dict(os.environ, **additional_env_vars)
+        ).decode()
+    except subprocess.CalledProcessError as e:
+        print("Error with command")
+        print(command_to_test)
+        print(e.output.decode())
+        exit()
 
     runtime_to_run += time() - st
     st = time()
@@ -162,7 +163,14 @@ for (len_database, nb_pattern, len_pattern, approximation_factor, files_to_open)
     seq_time, seq_dic_result = get_results(output_seq)
     parallel_time, parallel_dic_result = get_results(output_to_test)
 
-    correct_result += seq_dic_result == parallel_dic_result
+    is_correct = seq_dic_result == parallel_dic_result
+    if not is_correct:
+        print("Incorrect result")
+        print(command_to_test)
+        print(command_seq)
+        exit()
+
+    correct_result += is_correct
     total_runtime_seq += seq_time
     total_runtime_to_test += parallel_time
 

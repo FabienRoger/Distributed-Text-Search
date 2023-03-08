@@ -14,7 +14,7 @@
 
 #define APM_DEBUG 0
 
-int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU, THREAD_PER_BLOCK;
+int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU, THREAD_PER_BLOCK, BLOCK_PER_GRID;
 
 void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches);
 
@@ -297,6 +297,7 @@ int main(int argc, char **argv)
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
     USE_GPU = get_env_int("USE_GPU", 0);
     THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
+    BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
 
 #if APM_DEBUG
     printf("DISTRIBUTE_PATTERNS = %d, argc = %d\n", DISTRIBUTE_PATTERNS, argc);
@@ -422,7 +423,6 @@ int main(int argc, char **argv)
 #endif
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
-
     if (USE_GPU && big_enough_gpu_available(max_pattern_length))
     {
         compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
@@ -486,17 +486,15 @@ int main(int argc, char **argv)
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
     if (rank == 0)
+    {
         printf("%s done in %lf s (size ; %d)\n\n", argv[0], duration, comm_size);
-
-    /*****
-     * END MAIN LOOP
-     ******/
-    if (rank == 0)
         for (i = 0; i < nb_patterns; i++)
         {
             printf("Number of matches for pattern <%s>: %d\n",
                    pattern[i], n_matches[i]);
         }
+    }
+
     MPI_Finalize();
 
     return 0;

@@ -3,13 +3,13 @@
 #include <stdlib.h>
 
 #define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
+#define MIN2(a, b) (a < b ? a : b)
 
 // mem limited to ~40kB per block -> 256 x len < 40kB, len < 128!
-// TODO: make this smarter
-#define MAX_BLOCK_PER_GRID 65535
-#define MAX_PATTERN_LENGTH 16
 
-int THREAD_PER_BLOCK;
+int THREAD_PER_BLOCK, BLOCK_PER_GRID;
+int MAX_BLOCK_PER_GRID, MAX_THREAD_PER_BLOCK, MAX_SHARED_MEMORY_PER_BLOCK; // min of the physical and dictated values
+int gpu_initialized = 0;
 
 __device__ int levenshtein(char *s1, char *s2, int len, int *column)
 {
@@ -62,8 +62,25 @@ __global__ void compute_matches_kernel(char *buf, int start, int end, int n_byte
     }
 }
 
+void initialize_gpu()
+{
+    cudaSetDevice(0);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, 0);
+    MAX_BLOCK_PER_GRID = MIN2(prop.maxGridSize[0], BLOCK_PER_GRID);
+    MAX_THREAD_PER_BLOCK = MIN2(prop.maxThreadsPerBlock, THREAD_PER_BLOCK);
+    MAX_SHARED_MEMORY_PER_BLOCK = prop.sharedMemPerBlock;
+    gpu_initialized = 1;
+}
+
 extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **patterns, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches)
 {
+
+    if (gpu_initialized == 0)
+    {
+        initialize_gpu();
+    }
+
     // shifts the buffer and patterns to the start position
     buf = buf + start;
     end = end - start;
@@ -94,13 +111,11 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
         cudaMalloc((void **)&d_pattern, sizeof(char) * length);
         cudaMemcpy(d_pattern, pattern, sizeof(char) * length, cudaMemcpyHostToDevice);
 
-        int block_size = THREAD_PER_BLOCK;
-        int num_blocks = (end - start + block_size - 1) / block_size;
-        if (num_blocks > MAX_BLOCK_PER_GRID)
-        {
-            num_blocks = MAX_BLOCK_PER_GRID;
-        }
-        compute_matches_kernel<<<num_blocks, block_size, MAX_PATTERN_LENGTH * THREAD_PER_BLOCK * sizeof(int)>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i, max_pattern_length);
+        int mem_per_thread = (length + 1) * sizeof(int);
+        int block_size = MIN2(MAX_SHARED_MEMORY_PER_BLOCK / mem_per_thread, MAX_THREAD_PER_BLOCK);
+        int num_blocks = MIN2((end - start + block_size - 1) / block_size, MAX_BLOCK_PER_GRID);
+
+        compute_matches_kernel<<<num_blocks, block_size, block_size * mem_per_thread>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i, length);
 
         cudaFree(d_pattern);
     }
@@ -122,11 +137,12 @@ extern "C" int big_enough_gpu_available(int max_pattern_length)
     {
         return false;
     }
-    cudaSetDevice(0);
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
-    int max_shared_memory = prop.sharedMemPerBlock;
-    int required_shared_memory = max_pattern_length * THREAD_PER_BLOCK * sizeof(int);
+    if (gpu_initialized == 0)
+    {
+        initialize_gpu();
+    }
 
-    return required_shared_memory < max_shared_memory;
+    int required_shared_memory = max_pattern_length * MAX_THREAD_PER_BLOCK * sizeof(int);
+
+    return required_shared_memory < MAX_SHARED_MEMORY_PER_BLOCK;
 }
