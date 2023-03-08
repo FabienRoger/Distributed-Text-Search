@@ -102,11 +102,12 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
     char *d_buf;
     int *d_n_matches;
 
-    cudaSetDevice(0);
-    cudaMalloc((void **)&d_buf, sizeof(char) * n_bytes);
-    cudaMalloc((void **)&d_n_matches, sizeof(int) * endi);
-    cudaMemcpy(d_buf, buf, sizeof(char) * n_bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_n_matches, n_matches, sizeof(int) * endi, cudaMemcpyHostToDevice);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    cudaMallocAsync((void **)&d_buf, sizeof(char) * n_bytes, stream);
+    cudaMallocAsync((void **)&d_n_matches, sizeof(int) * endi, stream);
+    cudaMemcpyAsync(d_buf, buf, sizeof(char) * n_bytes, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyAsync(d_n_matches, n_matches, sizeof(int) * endi, cudaMemcpyHostToDevice, stream);
 
     /* Traverse the patterns */
     for (i = starti; i < endi; i++)
@@ -114,8 +115,8 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
         int length = strlen(patterns[i]);
         char *pattern = patterns[i];
         char *d_pattern;
-        cudaMalloc((void **)&d_pattern, sizeof(char) * length);
-        cudaMemcpy(d_pattern, pattern, sizeof(char) * length, cudaMemcpyHostToDevice);
+        cudaMallocAsync((void **)&d_pattern, sizeof(char) * length, stream);
+        cudaMemcpyAsync(d_pattern, pattern, sizeof(char) * length, cudaMemcpyHostToDevice, stream);
 
         int mem_per_thread = required_mem(length);
         int block_size = MIN2(MAX_SHARED_MEMORY_PER_BLOCK / mem_per_thread, MAX_THREAD_PER_BLOCK);
@@ -123,16 +124,16 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
         int num_blocks = MIN2((end - start + block_size - 1) / block_size, MAX_BLOCK_PER_GRID);
         num_blocks = MAX2(1, num_blocks);
 
-        compute_matches_kernel<<<num_blocks, block_size, block_size * mem_per_thread>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i, length);
+        compute_matches_kernel<<<num_blocks, block_size, block_size * mem_per_thread, stream>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i, length);
 
-        cudaFree(d_pattern);
+        cudaFreeAsync(d_pattern, stream);
     }
 
     /* Transfer back */
-    cudaMemcpy(n_matches, d_n_matches, sizeof(int) * endi, cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(n_matches, d_n_matches, sizeof(int) * endi, cudaMemcpyDeviceToHost, stream);
     /* Free */
-    cudaFree(d_buf);
-    cudaFree(d_n_matches);
+    cudaFreeAsync(d_buf, stream);
+    cudaFreeAsync(d_n_matches, stream);
 
     // cudaDeviceSynchronize();
 }
