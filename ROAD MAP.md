@@ -1,3 +1,19 @@
+features to add
+- add only gpu flag / change to GPU-USAGE
+- make the GPU only used by rank 0
+- add mixed openmp and GPU (with a flag specifying the ratio of openmp and GPU)
+
+todo:
+add missing flags and features
+run experiments
+do plots
+add autonatic decisions
+do graph of our decision tree
+do slides
+
+
+
+
 ROAD MAP: 
 
 - On commence par uniquement du static dispatching

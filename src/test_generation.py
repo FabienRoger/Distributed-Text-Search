@@ -1,14 +1,15 @@
-import random
-import numpy as np
-import string
 import itertools
 import os
+import random
 import re
+import string
 import subprocess
 import sys
 from pathlib import Path
-from tqdm import tqdm
 from time import time
+
+import numpy as np
+from tqdm import tqdm
 
 random.seed(0)
 np.random.seed(0)

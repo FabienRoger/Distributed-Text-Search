@@ -14,8 +14,7 @@
 
 #define APM_DEBUG 0
 
-// TODO: make this smarter
-#define MAX_PATTERN_LENGTH_GPU 16
+int MAX_PATTERN_LENGTH_GPU;
 
 int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU;
 

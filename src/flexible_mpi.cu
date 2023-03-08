@@ -7,9 +7,10 @@
 // mem limited to ~40kB per block -> 256 x len < 40kB, len < 128!
 // TODO: make this smarter
 #define THREAD_PER_BLOCK 256
-#define MAX_PATTERN_LENGTH_GPU 16
-
+#define MAX_PATTERN_LENGTH 16
 #define MAX_BLOCK_PER_GRID 65535
+
+int MAX_PATTERN_LENGTH_GPU = MAX_PATTERN_LENGTH;
 
 __device__ int levenshtein(char *s1, char *s2, int len, int *column)
 {
@@ -38,8 +39,8 @@ __device__ int levenshtein(char *s1, char *s2, int len, int *column)
 
 __global__ void compute_matches_kernel(char *buf, int start, int end, int n_bytes, int length, char *pattern, int approx_factor, int *n_matches)
 {
-    __shared__ int column[MAX_PATTERN_LENGTH_GPU * THREAD_PER_BLOCK];
-    int *my_column = &column[threadIdx.x * MAX_PATTERN_LENGTH_GPU];
+    __shared__ int column[MAX_PATTERN_LENGTH * THREAD_PER_BLOCK];
+    int *my_column = &column[threadIdx.x * MAX_PATTERN_LENGTH];
     int j;
     int skip_size = blockDim.x * gridDim.x;
     for (j = start + blockIdx.x * blockDim.x + threadIdx.x; j < end; j += skip_size)
