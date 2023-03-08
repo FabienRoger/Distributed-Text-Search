@@ -64,7 +64,7 @@ def generate_random_string(length, nb=1):
         return res
 
 
-param = "many_pattern_large_files"
+param = "large_pattern_large_file"
 
 if param == "diverse":
     list_len_database = (

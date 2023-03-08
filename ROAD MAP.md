@@ -1,25 +1,25 @@
 features to add
+
+- dynamic shared gpu memory
 - add only gpu flag / change to GPU-USAGE
 - make the GPU only used by rank 0
 - add mixed openmp and GPU (with a flag specifying the ratio of openmp and GPU)
 
 todo:
-add missing flags and features
+add missing features
 run experiments
 do plots
 add autonatic decisions
 do graph of our decision tree
 do slides
 
-
-
-
-ROAD MAP: 
+ROAD MAP:
 
 - On commence par uniquement du static dispatching
 - On essaye d'implementer le vol de travail par la suite
 
-2) Distribution du texte
+2. Distribution du texte
+
 - Tout le monde a acces au texte en entier
 - Chaque machine calcule avec le score sur une partie du texte
 
@@ -30,7 +30,8 @@ Distributed version over 8 cores, 1 machine : 0.06s
 Distributed version over 8 cores, 8 machines : 0.40s
 Distributed version over 64 cores, 8 machines : 0.19s
 
-3) Distribution des patterns
+3. Distribution des patterns
+
 - Chaque machine calcule un unique patterne et tout le texte
 
 Resultat (10 patterns, texte 24k char):
@@ -38,8 +39,7 @@ Sequential version : 0.26s
 Texte-Distributed over 64 cores, 8 machines : 0.02s
 Patern-Distributed over 64 cores, 8 machines : 0.06s
 
-4) Distribution de pairs (texte, pattern)
-
+4. Distribution de pairs (texte, pattern)
 
 Recap :
 apm : sequentiel (aucune modif)
@@ -47,8 +47,9 @@ apm1 : mpi sequentiel
 apm2 : texte distribue brutalement
 apm3 : patterns distribue brutalement uniquement
 apm4 : si nb pattern > comm_size, on distribue sur les patterns uniquement. Sinon on distribue brutalement le texte mais on divise le travail par portion de texte et pattern.
-apm5 : 
+apm5 :
 
-Next step : 
+Next step :
+
 - Distribue des petites parties de texte
 - Bien gerer l'ouverture du/des fichiers

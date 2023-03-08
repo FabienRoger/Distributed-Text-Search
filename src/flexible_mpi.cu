@@ -6,11 +6,10 @@
 
 // mem limited to ~40kB per block -> 256 x len < 40kB, len < 128!
 // TODO: make this smarter
-#define THREAD_PER_BLOCK 256
-#define MAX_PATTERN_LENGTH 16
 #define MAX_BLOCK_PER_GRID 65535
+#define MAX_PATTERN_LENGTH 16
 
-int MAX_PATTERN_LENGTH_GPU = MAX_PATTERN_LENGTH;
+int THREAD_PER_BLOCK;
 
 __device__ int levenshtein(char *s1, char *s2, int len, int *column)
 {
@@ -37,10 +36,10 @@ __device__ int levenshtein(char *s1, char *s2, int len, int *column)
     return (column[len]);
 }
 
-__global__ void compute_matches_kernel(char *buf, int start, int end, int n_bytes, int length, char *pattern, int approx_factor, int *n_matches)
+__global__ void compute_matches_kernel(char *buf, int start, int end, int n_bytes, int length, char *pattern, int approx_factor, int *n_matches, int max_pattern_length)
 {
-    __shared__ int column[MAX_PATTERN_LENGTH * THREAD_PER_BLOCK];
-    int *my_column = &column[threadIdx.x * MAX_PATTERN_LENGTH];
+    extern __shared__ int column[];
+    int *my_column = &column[threadIdx.x * max_pattern_length];
     int j;
     int skip_size = blockDim.x * gridDim.x;
     for (j = start + blockIdx.x * blockDim.x + threadIdx.x; j < end; j += skip_size)
@@ -79,6 +78,8 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
     /* Allocate & transfer */
     char *d_buf;
     int *d_n_matches;
+
+    cudaSetDevice(0);
     cudaMalloc((void **)&d_buf, sizeof(char) * n_bytes);
     cudaMalloc((void **)&d_n_matches, sizeof(int) * endi);
     cudaMemcpy(d_buf, buf, sizeof(char) * n_bytes, cudaMemcpyHostToDevice);
@@ -99,7 +100,7 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
         {
             num_blocks = MAX_BLOCK_PER_GRID;
         }
-        compute_matches_kernel<<<num_blocks, block_size>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i);
+        compute_matches_kernel<<<num_blocks, block_size, MAX_PATTERN_LENGTH * THREAD_PER_BLOCK * sizeof(int)>>>(d_buf, start, end, n_bytes, length, d_pattern, approx_factor, d_n_matches + i, max_pattern_length);
 
         cudaFree(d_pattern);
     }
@@ -113,57 +114,19 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
     cudaDeviceSynchronize();
 }
 
-__global__ void sum_all_kernel(int *a, int *sum, int n)
+extern "C" int big_enough_gpu_available(int max_pattern_length)
 {
-    extern __shared__ int sdata[];
-    int tid = threadIdx.x;
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    sdata[tid] = (i < n) ? a[i] : 0;
-    __syncthreads();
-
-    for (int s = blockDim.x / 2; s > 0; s >>= 1)
+    int deviceCount = 0;
+    cudaError_t error_id = cudaGetDeviceCount(&deviceCount);
+    if (deviceCount < 1)
     {
-        if (tid < s)
-        {
-            sdata[tid] += sdata[tid + s];
-        }
-        __syncthreads();
+        return false;
     }
+    cudaSetDevice(0);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, 0);
+    int max_shared_memory = prop.sharedMemPerBlock;
+    int required_shared_memory = max_pattern_length * THREAD_PER_BLOCK * sizeof(int);
 
-    if (tid == 0)
-    {
-        sum[blockIdx.x] = sdata[0];
-    }
-}
-
-extern "C" int sum_all(int *a, int n)
-{
-    int *d_a, *d_sum;
-    int sum = 0;
-
-    cudaMalloc((void **)&d_a, sizeof(int) * n);
-    cudaMalloc((void **)&d_sum, sizeof(int) * n);
-
-    cudaMemcpy(d_a, a, sizeof(int) * n, cudaMemcpyHostToDevice);
-
-    int block_size = 256;
-    int num_blocks = (n + block_size - 1) / block_size;
-
-    sum_all_kernel<<<num_blocks, block_size, block_size * sizeof(int)>>>(d_a, d_sum, n);
-
-    while (num_blocks > 1)
-    {
-        int threads = block_size;
-        int blocks = (num_blocks + threads - 1) / threads;
-        sum_all_kernel<<<blocks, threads, threads * sizeof(int)>>>(d_sum, d_sum, num_blocks);
-        num_blocks = blocks;
-    }
-
-    cudaMemcpy(&sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost);
-
-    cudaFree(d_a);
-    cudaFree(d_sum);
-
-    return sum;
+    return required_shared_memory < max_shared_memory;
 }

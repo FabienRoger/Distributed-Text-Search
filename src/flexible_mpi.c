@@ -14,13 +14,11 @@
 
 #define APM_DEBUG 0
 
-int MAX_PATTERN_LENGTH_GPU;
-
-int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU;
-
-int sum_all(int *a, int n);
+int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU, THREAD_PER_BLOCK;
 
 void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches);
+
+int big_enough_gpu_available(int max_pattern_length);
 
 int get_env_int(char *var_name, int def)
 {
@@ -298,6 +296,7 @@ int main(int argc, char **argv)
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
     USE_GPU = get_env_int("USE_GPU", 0);
+    THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
 
 #if APM_DEBUG
     printf("DISTRIBUTE_PATTERNS = %d, argc = %d\n", DISTRIBUTE_PATTERNS, argc);
@@ -306,16 +305,6 @@ int main(int argc, char **argv)
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
-
-    // int *a = (int *)malloc(100 * sizeof(int));
-    // for (i = 0; i < 100; i++)
-    // {
-    //     a[i] = i;
-    // }
-    // int r = sum_all(a, 100);
-    // printf("rank = %d, sum = %d", rank, r);
-    // MPI_Finalize();
-    // return 0;
 
 #if APM_DEBUG
     if (rank == 0)
@@ -434,7 +423,7 @@ int main(int argc, char **argv)
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
 
-    if (USE_GPU && max_pattern_length <= MAX_PATTERN_LENGTH_GPU)
+    if (USE_GPU && big_enough_gpu_available(max_pattern_length))
     {
         compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
     }
@@ -452,7 +441,7 @@ int main(int argc, char **argv)
                        (max_pattern_length + 1) * sizeof(int));
                 exit(1);
             }
-#pragma omp for schedule(static) collapse(2)
+#pragma omp for schedule(dynamic) collapse(2)
             /* Traverse the patterns */
             for (i = starti; i < endi; i++)
             {
