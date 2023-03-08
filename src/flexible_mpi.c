@@ -14,11 +14,13 @@
 
 #define APM_DEBUG 0
 
-int DISTRIBUTE_PATTERNS, ONLY_RANK_0, USE_GPU, THREAD_PER_BLOCK, BLOCK_PER_GRID;
+int DISTRIBUTE_PATTERNS, ONLY_RANK_0, THREAD_PER_BLOCK, BLOCK_PER_GRID, PERCENTAGE_GPU;
 
 void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches);
 
 int big_enough_gpu_available(int max_pattern_length);
+
+void sync_gpu();
 
 int get_env_int(char *var_name, int def)
 {
@@ -298,7 +300,7 @@ int main(int argc, char **argv)
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
-    USE_GPU = get_env_int("USE_GPU", 0);
+    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 50);
     THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
     BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
 
@@ -422,7 +424,7 @@ int main(int argc, char **argv)
 #endif
 
     buf = actual_data - start; // make the buffer start at "the beginning" of the data
-    if (USE_GPU && big_enough_gpu_available(max_pattern_length))
+    if (PERCENTAGE_GPU && big_enough_gpu_available(max_pattern_length))
     {
         compute_matches_gpu(buf, start, end, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches);
     }
@@ -440,6 +442,9 @@ int main(int argc, char **argv)
                        (max_pattern_length + 1) * sizeof(int));
                 exit(1);
             }
+            int *local_n_matches_ = (int *)malloc((endi - starti) * sizeof(int));
+            int *local_n_matches = local_n_matches_ - starti;
+
 #pragma omp for schedule(dynamic) collapse(2)
             /* Traverse the patterns */
             for (i = starti; i < endi; i++)
@@ -461,15 +466,23 @@ int main(int argc, char **argv)
 
                     if (distance <= approx_factor)
                     {
-#pragma omp atomic
-                        n_matches[i]++;
+                        local_n_matches[i]++;
                     }
                 }
             }
+
+            for (i = starti; i < endi; i++)
+            {
+#pragma omp atomic
+                n_matches[i] += local_n_matches[i];
+            }
+
+            free(local_n_matches_);
             free(column);
         }
     }
 
+    sync_gpu();
     MPI_Barrier(MPI_COMM_WORLD);
     // reduce the number of matches
     for (i = 0; i < nb_patterns; i++)

@@ -134,7 +134,7 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
     cudaFree(d_buf);
     cudaFree(d_n_matches);
 
-    cudaDeviceSynchronize();
+    // cudaDeviceSynchronize();
 }
 
 extern "C" int big_enough_gpu_available(int max_pattern_length)
@@ -153,4 +153,9 @@ extern "C" int big_enough_gpu_available(int max_pattern_length)
     int required_shared_memory = required_mem(max_pattern_length);
 
     return required_shared_memory < MAX_SHARED_MEMORY_PER_BLOCK;
+}
+
+extern "C" void sync_gpu()
+{
+    cudaDeviceSynchronize();
 }
