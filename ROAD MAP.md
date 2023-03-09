@@ -26,6 +26,8 @@ perfs vs percentage (lines)
 
 perfs vs threads vs blocks (heatmap)
 
+perf en pattern vs no pattern distributed en fction de n_data/n_pattern
+
 how it scales:
 perfs vs nb of machines
 
