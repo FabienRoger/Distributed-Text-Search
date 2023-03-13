@@ -65,7 +65,7 @@ def generate_random_string(length, nb=1):
         return res
 
 
-param = "diverse"
+param = "very_large_file"
 
 if param == "diverse":
     list_len_database = list(range(20, 200, 20)) + list(range(200, 2_000, 200)) + list(range(2_000, 10_000, 2_000))
@@ -85,6 +85,12 @@ elif param == "many_pattern_large_files":
     list_len_pattern = [12, 15]
     list_approximation_factor = [0, 1]
     list_files_to_open = [2, 4]
+elif param == "very_large_file":
+    list_len_database = [1_000_000]
+    list_nb_pattern = [1]
+    list_len_pattern = [100]
+    list_approximation_factor = [4]
+    list_files_to_open = [4]
 
 regex_exec_time = re.compile(r"done in ([0-9\.]*) s")
 regex_matches = re.compile(r"Number of matches for pattern <([A-Z]*)>: ([0-9]*)")

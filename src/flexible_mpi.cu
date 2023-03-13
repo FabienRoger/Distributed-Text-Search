@@ -90,6 +90,7 @@ extern "C" void compute_matches_gpu(char *buf, int start, int end, int n_bytes, 
     // shifts the buffer and patterns to the start position
     buf = buf + start;
     end = end - start;
+    end_data = end_data - start;
     n_bytes = n_bytes - start;
     start = 0;
     patterns = patterns + starti;
