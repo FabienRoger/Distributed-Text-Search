@@ -20,16 +20,15 @@ small files 100 large pattern
 small files 10000 small patterns
 
 barplot in 4 refs
-default vs only rank 0 vs only omp vs only gpu vs only rank 0 and no omp and no gpu vs distributed or not
+pl default vs only rank 0 vs only omp vs only gpu vs only rank 0 and no omp and no gpu vs distributed or not
 
-perfs vs percentage (lines)
+ok perfs vs percentage (lines)
 
-perfs vs threads vs blocks (heatmap)
+ok perfs vs threads vs blocks (heatmap)
 
-perf en pattern vs no pattern distributed en fction de n_data/n_pattern
+ok perf en pattern vs no pattern distributed en fction de n_data/n_pattern
 
-how it scales:
-perfs vs nb of machines
+td perfs vs nb of machines
 
 ROAD MAP:
 

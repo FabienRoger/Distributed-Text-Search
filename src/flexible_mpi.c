@@ -14,7 +14,7 @@
 
 #define APM_DEBUG 0
 
-int DISTRIBUTE_PATTERNS, ONLY_RANK_0, THREAD_PER_BLOCK, BLOCK_PER_GRID, PERCENTAGE_GPU;
+int DISTRIBUTE_PATTERNS, ONLY_RANK_0, THREAD_PER_BLOCK, BLOCK_PER_GRID, PERCENTAGE_GPU, FORCE_GPU;
 
 void compute_matches_gpu(char *buf, int start, int end, int n_bytes, char **pattern, int starti, int endi, int approx_factor, int max_pattern_length, int *n_matches, int end_data);
 
@@ -307,8 +307,9 @@ int main(int argc, char **argv)
 
     DISTRIBUTE_PATTERNS = get_env_int("DISTRIBUTE_PATTERNS", 1);
     ONLY_RANK_0 = get_env_int("ONLY_RANK_0", 0);
-    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 20);
-    THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 256);
+    PERCENTAGE_GPU = get_env_int("PERCENTAGE_GPU", 90);
+    FORCE_GPU = get_env_int("FORCE_GPU", 0);
+    THREAD_PER_BLOCK = get_env_int("THREAD_PER_BLOCK", 128);
     BLOCK_PER_GRID = get_env_int("BLOCK_PER_GRID", 65535);
 
     MPI_Init(&argc, &argv);
@@ -317,7 +318,8 @@ int main(int argc, char **argv)
 
 #if APM_DEBUG
     if (rank == 0)
-        printf("comm_size = %d", comm_size);
+        printf("comm_size = %d, DISTRIBUTE_PATTERNS = %d, ONLY_RANK_0 = %d, PERCENTAGE_GPU = %d, FORCE_GPU = %d, THREAD_PER_BLOCK = %d, BLOCK_PER_GRID = %d\n",
+               comm_size, DISTRIBUTE_PATTERNS, ONLY_RANK_0, PERCENTAGE_GPU, FORCE_GPU, THREAD_PER_BLOCK, BLOCK_PER_GRID);
 #endif
 
     parse_args(argc, argv, rank, &approx_factor, &filename, &pattern, &nb_patterns);
@@ -454,6 +456,11 @@ int main(int argc, char **argv)
     if (!big_enough_gpu_available(max_pattern_length))
     {
         PERCENTAGE_GPU = 0;
+        if (FORCE_GPU)
+        {
+            printf("Not enough GPU available, aborting\n");
+            return 1;
+        }
     }
     int start_gpu = start;
     int end_gpu = start + ((end - start) * PERCENTAGE_GPU) / 100;
@@ -461,7 +468,9 @@ int main(int argc, char **argv)
     int start_openmp = end_gpu;
     int end_openmp = end;
     int end_data_openmp = end_data;
+#if APM_DEBUG
     printf("start : %d, end : %d, start_openmp : %d, end_openmp : %d\n", start, end, start_openmp, end_openmp);
+#endif
     compute_matches_gpu(buf, start_gpu, end_gpu, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches_gpu, end_data);
 
 #pragma omp parallel private(i, j) shared(buf, start_openmp, end_openmp, n_bytes, pattern, starti, endi, approx_factor, max_pattern_length, n_matches_openmp) default(none)

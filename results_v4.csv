@@ -1,0 +1,29 @@
+scenario,setting,mean_time,std_time
+large files 1 large patterns,default,0.48880099999999993,0.006838735204699776
+large files 1 large patterns,pattern not distributed,0.48796720000000005,0.015623741452033818
+large files 1 large patterns,mpi + gpu,0.41418420000000006,0.02913914927653174
+large files 1 large patterns,only mpi,0.44763899999999995,0.005779907784731518
+large files 1 large patterns,only omp,1.972019,0.1135628873655474
+large files 1 large patterns,only gpu,0.2868284,0.061645399797876255
+large files 1 large patterns,no parallelism,2.2127464,0.008527480228062672
+large files 100 small patterns,default,0.424172,0.00872297467610677
+large files 100 small patterns,pattern not distributed,0.4223616,0.007286847757432562
+large files 100 small patterns,mpi + gpu,0.42457340000000005,0.008768328086927402
+large files 100 small patterns,only mpi,0.4764054,0.014348970689216691
+large files 100 small patterns,only omp,1.9654308,0.11259738383177471
+large files 100 small patterns,only gpu,0.31407360000000006,0.06410094809158441
+large files 100 small patterns,no parallelism,2.0430979999999996,0.11234256105857655
+small files 10 large patterns,default,0.41663700000000004,0.008185164506593621
+small files 10 large patterns,pattern not distributed,0.507521,0.027294084399371248
+small files 10 large patterns,mpi + gpu,0.4627994,0.04261068948327403
+small files 10 large patterns,only mpi,0.4601846,0.013927053609432262
+small files 10 large patterns,only omp,1.9527514,0.11766215355431835
+small files 10 large patterns,only gpu,0.3140236,0.07271084390818196
+small files 10 large patterns,no parallelism,2.0787614,0.11627430640274751
+small files 1000 small patterns,default,0.3901260000000001,0.05041305128238122
+small files 1000 small patterns,pattern not distributed,0.568389,0.012640173780450964
+small files 1000 small patterns,mpi + gpu,0.36461819999999995,0.09617303917294077
+small files 1000 small patterns,only mpi,0.46715999999999996,0.0008510948243292162
+small files 1000 small patterns,only omp,1.9781386,0.11238011244806613
+small files 1000 small patterns,only gpu,0.35389020000000004,0.06887682385650488
+small files 1000 small patterns,no parallelism,2.0191388,0.15102756333252554
