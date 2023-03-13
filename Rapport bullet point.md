@@ -1,0 +1,9 @@
+- Presentation du probleme
+- Presentation des ressources a disposition (ca prend 2 secondes de compter combien de machine on a a l'X : 172, le nombre de coeur total : 1452 etc ...)
+- Remerciements au prof ?
+- Partie OpenMP
+- Partie MPI
+- Partie Cuda
+- Comment on separe le travail ?
+- Les differentes taillesq d'instances ?
+- Nos experiences/Nos resultats

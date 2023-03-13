@@ -6,7 +6,7 @@ import string
 import subprocess
 import sys
 from pathlib import Path
-from time import time
+from time import time, sleep
 
 import numpy as np
 from tqdm import tqdm, trange
@@ -86,6 +86,7 @@ def measure_runtime(
     # if "OMP_NUM_THREADS" in additional_env_vars and additional_env_vars["OMP_NUM_THREADS"] > 1:
     #     mpi_processes_per_node = 1
     
+    
     cmd = f"salloc -N {nodes} -n {nodes * mpi_processes_per_node} mpirun"
     
     additional_env_vars = {k: str(v) for k, v in additional_env_vars.items()}
@@ -150,23 +151,105 @@ def measure_runtime(
 
 
 # creae results file
-with open("results.csv", "w") as f:
-    f.write("scenario,setting,exec_time,transmit_time,compute_time,gather_time\n")
+# with open("results.csv", "w") as f:
+#     f.write("scenario,setting,exec_time,transmit_time,compute_time,gather_time\n")
+
+#     for scenario_name, scenario in scenarios.items():
+#         print(f"Running scenario {scenario_name}")
+
+#         for setting_name, setting in settings.items():
+#             print(f"Running setting {setting_name}")
+#             runtime, transmit, compute, gather = measure_runtime(
+#                 5,
+#                 setting,
+#                 *scenario,
+#             )
+#             print(f"Total runtime {runtime:.2f} s")
+
+#             f.write(f"{scenario_name},{setting_name},{runtime:.2f},{transmit:.2f},{compute:.2f},{gather:.2f}\n")
+
+#             print()
+
+#         print()
+
+
+# ## Scaling en fonction du nombre de machines
+# with open("results_scaling_machine.csv", "a") as f:
+#     # f.write("scenario,setting,exec_time,transmit_time,compute_time,gather_time,nb_nodes\n")
+#     for scenario_name, scenario in list(scenarios.items())[::-1]:
+#         print(f"Running scenario {scenario_name}")
+#         for nb_nodes in range(1, 100):
+#             setting_name = "only mpi"
+#             setting = settings[setting_name]
+            
+#             sleep(2)
+#             print(f"Running on {nb_nodes} nodes")
+            
+#             try:
+#                 runtime, transmit, compute, gather = measure_runtime(
+#                     5,
+#                     setting,
+#                     *scenario,
+#                     nodes=nb_nodes,
+#                     mpi_processes_per_node=1
+#                 )
+#                 print(f"Total runtime {runtime:.2f} s")
+
+#                 f.write(f"{scenario_name},{setting_name},{runtime:.2f},{transmit:.2f},{compute:.2f},{gather:.2f},{nb_nodes}\n")
+#                 f.flush()
+#             except:
+#                 pass
+#             print()
+
+
+
+# ### Scaling en fonction du ndata/npattern suivant pattern (un)distributed
+# with open("results_scaling_ndata_npattern_distributed_or_not.csv", "a") as f:
+#     # f.write("ndata,n_pattern,l_pattern,distributed_pattern,exec_time,transmit_time,compute_time,gather_time\n")
+
+#     for ndata in range(1_000, 10_000, 1_000):
+#         for n_pattern in range(1, 1_000, 100):
+#             for l_pattern in [50]:
+#                 scenario = (ndata, n_pattern, l_pattern, 4, 4)
+#                 for setting_name in ["pattern not distributed", "pattern distributed"]:
+#                     setting = settings[setting_name]
+    
+#                     try:
+#                         runtime, transmit, compute, gather = measure_runtime(
+#                             5,
+#                             setting,
+#                             *scenario
+#                         )
+#                         print(f"Total runtime {runtime:.2f} s")
+
+#                         f.write(f"{ndata},{n_pattern},{l_pattern},{setting_name},{runtime:.2f},{transmit:.2f},{compute:.2f},{gather:.2f}\n")
+#                         f.flush()
+#                     except:
+#                         pass
+#                     print()
+
+
+### Scaling en fonction du pourcentage GPU
+with open("results_gpu_percentage.csv", "a") as f:
+    f.write("scenario,percentage_gpu,exec_time,transmit_time,compute_time,gather_time\n")
 
     for scenario_name, scenario in scenarios.items():
         print(f"Running scenario {scenario_name}")
 
-        for setting_name, setting in settings.items():
-            print(f"Running setting {setting_name}")
-            runtime, transmit, compute, gather = measure_runtime(
-                5,
-                setting,
-                *scenario,
-            )
-            print(f"Total runtime {runtime:.2f} s")
+        for percentage_gpu in range(0,105,5):
+            print(f"Running with {percentage_gpu}% on gpu")
+            try:
+                runtime, transmit, compute, gather = measure_runtime(
+                    5,
+                    {"PERCENTAGE_GPU": percentage_gpu},
+                    *scenario,
+                )
+                print(f"Total runtime {runtime:.2f} s")
 
-            f.write(f"{scenario_name},{setting_name},{runtime:.2f},{transmit:.2f},{compute:.2f},{gather:.2f}\n")
-
+                f.write(f"{scenario_name},{percentage_gpu},{runtime:.2f},{transmit:.2f},{compute:.2f},{gather:.2f}\n")
+                f.flush()
+            except:
+                pass
+            
             print()
-
         print()
