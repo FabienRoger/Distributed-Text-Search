@@ -1,17 +1,17 @@
 scenario,setting,mean_time,std_time
-large files 1 large patterns,mpi + omp + gpu,0.316037,0.0
-large files 1 large patterns,mpi + omp,0.46764,0.0
-large files 1 large patterns,mpi,0.472352,0.0
-large files 1 large patterns,no parallelism,1.937343,0.0
-large files 100 small patterns,mpi + omp + gpu,0.310177,0.0
-large files 100 small patterns,mpi + omp,0.484567,0.0
-large files 100 small patterns,mpi,0.496727,0.0
-large files 100 small patterns,no parallelism,1.857375,0.0
-small files 10 large patterns,mpi + omp + gpu,0.298161,0.0
-small files 10 large patterns,mpi + omp,0.540153,0.0
-small files 10 large patterns,mpi,0.572517,0.0
-small files 10 large patterns,no parallelism,1.886655,0.0
-small files 1000 small patterns,mpi + omp + gpu,0.311725,0.0
-small files 1000 small patterns,mpi + omp,0.470401,0.0
-small files 1000 small patterns,mpi,0.471827,0.0
-small files 1000 small patterns,no parallelism,1.849601,0.0
+large files 1 large patterns,mpi + omp + gpu,0.363302,0.0
+large files 1 large patterns,mpi + omp,0.439628,0.0
+large files 1 large patterns,mpi,0.448407,0.0
+large files 1 large patterns,no parallelism,2.052945,0.0
+large files 100 small patterns,mpi + omp + gpu,0.274897,0.0
+large files 100 small patterns,mpi + omp,0.431457,0.0
+large files 100 small patterns,mpi,0.470484,0.0
+large files 100 small patterns,no parallelism,1.952536,0.0
+small files 10 large patterns,mpi + omp + gpu,0.255071,0.0
+small files 10 large patterns,mpi + omp,0.514348,0.0
+small files 10 large patterns,mpi,0.586764,0.0
+small files 10 large patterns,no parallelism,2.007715,0.0
+small files 1000 small patterns,mpi + omp + gpu,0.25719,0.0
+small files 1000 small patterns,mpi + omp,0.436416,0.0
+small files 1000 small patterns,mpi,0.460168,0.0
+small files 1000 small patterns,no parallelism,1.966116,0.0
