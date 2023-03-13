@@ -527,6 +527,9 @@ int main(int argc, char **argv)
     sync_gpu();
     MPI_Barrier(MPI_COMM_WORLD);
     gettimeofday(&t3, NULL);
+#if APM_DEBUG
+    printf("[%d] Computation are all done \n", rank);
+#endif
     // reduce the number of matches
     for (i = 0; i < nb_patterns; i++)
     {
