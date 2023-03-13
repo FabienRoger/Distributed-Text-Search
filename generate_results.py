@@ -58,12 +58,9 @@ scenarios = {
 }
 
 settings = {
-    "default": {},
-    "pattern not distributed": {"DISTRIBUTE_PATTERNS": 0},
-    "mpi + gpu": {"PERCENTAGE_GPU": 100},
-    "only mpi": {"OMP_NUM_THREADS": 1, "PERCENTAGE_GPU": 0},
-    "only omp": {"ONLY_RANK_0": 1, "OMP_NUM_THREADS": 8, "PERCENTAGE_GPU": 0},
-    "only gpu": {"ONLY_RANK_0": 1, "PERCENTAGE_GPU": 100},
+    "mpi + omp + gpu": {},
+    "mpi + omp": {"PERCENTAGE_GPU": 0},
+    "mpi": {"OMP_NUM_THREADS": 1, "PERCENTAGE_GPU": 0},
     "no parallelism": {"ONLY_RANK_0": 1, "OMP_NUM_THREADS": 1, "PERCENTAGE_GPU": 0},
 }
 
@@ -76,8 +73,8 @@ def measure_runtime(
     len_pattern,
     approximation_factor,
     files_to_open,
-    nodes=8,
-    mpi_processes_per_node=8,
+    nodes=4,
+    mpi_processes_per_node=4,
 ):
 
     random.seed(0)
@@ -130,7 +127,7 @@ def measure_runtime(
                 command_to_test.split(),
                 env=env,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
             ).stdout.decode()
 
         except subprocess.CalledProcessError as e:
@@ -147,11 +144,15 @@ def measure_runtime(
             dic_result = {pattern: nbMatches for (pattern, nbMatches) in raw_result}
             return exec_times, dic_result
 
-        parallel_times, parallel_dic_result = get_results(output_to_test)
-        total_runtime = parallel_times[0]
-        total_runtimes.append(total_runtime)
+        try:
+            parallel_times, parallel_dic_result = get_results(output_to_test)
+            total_runtime = parallel_times[0]
+            total_runtimes.append(total_runtime)
 
-        runtime_to_find += time() - st
+            runtime_to_find += time() - st
+        except:
+            print("Error with output")
+            print(output_to_test)
 
     return np.mean(total_runtimes), np.std(total_runtimes)
 
@@ -166,7 +167,7 @@ with open("results_v4.csv", "w") as f:
         for setting_name, setting in settings.items():
             print(f"Running setting {setting_name}")
             mean_runtime, std_runtime = measure_runtime(
-                5,
+                1,
                 setting,
                 *scenario,
             )
@@ -238,29 +239,6 @@ with open("results_distributed_and_pattern_v4_no_gpu.csv", "w") as f:
             print()
 
 
-### Strong scaling
-with open("results_strong_scaling_v4.csv", "w") as f:
-    f.write("scenario,nodes,mean_time,std_time\n")
-
-    for scenario_name, scenario in scenarios.items():
-        print(f"Running scenario {scenario_name}")
-
-        for nodes in [1, 2, 4, 8, 16, 32, 64]:
-            print(f"Running with {nodes} nodes")
-            mean_runtime, std_runtime = measure_runtime(
-                5,
-                {},
-                *scenario,
-                nodes=nodes,
-            )
-            print(f"Total runtime {mean_runtime:.2f} s")
-
-            f.write(f"{scenario_name},{nodes},{mean_runtime},{std_runtime}\n")
-            f.flush()
-
-            print()
-        print()
-
 ### Weak scaling
 with open("results_weak_scaling_v4.csv", "w") as f:
     f.write("scenario,nodes,mean_time,std_time\n")
@@ -271,13 +249,14 @@ with open("results_weak_scaling_v4.csv", "w") as f:
         for nodes in [1, 2, 4, 8, 16, 32, 64]:
             print(f"Running with {nodes} nodes")
 
-            ndata, *rest = scenario
-            ndata = ndata * 8 // nodes
+            ndata, npatterns, *rest = scenario
+            npatterns = npatterns * nodes // 8
 
             mean_runtime, std_runtime = measure_runtime(
                 5,
                 {},
                 ndata,
+                npatterns,
                 *rest,
                 nodes=nodes,
             )

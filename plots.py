@@ -2,6 +2,10 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib import rcParams
+
+rcParams["figure.figsize"] = (10, 6)
+plt.style.use("ggplot")
 
 # %%
 scenario_names = [
@@ -71,4 +75,42 @@ for distributed in [0, 1]:
 plt.legend()
 plt.show()
 
+# %%
+
+# # Compare the different settings
+# with open("results_v4.csv", "w") as f:
+#     f.write("scenario,setting,mean_time,std_time\n")
+result_settings = pd.read_csv("results_v4.csv")
+
+# hbar plots of the different settings
+
+height = 0.1
+settings = result_settings["setting"].unique()
+scenarios = result_settings["scenario"].unique()
+for i, setting in enumerate(settings):  # type: ignore
+    ys = np.arange(len(scenarios)) + i * height
+    plt.barh(
+        ys,
+        result_settings[result_settings["setting"] == setting]["mean_time"],
+        height,
+        xerr=result_settings[result_settings["setting"] == setting]["std_time"],
+        label=setting,
+    )
+plt.ylabel("scenario")
+plt.yticks(ys, scenarios)
+plt.xlabel("mean execution time [s]")
+plt.legend()
+# %%
+### Weak scaling
+# with open("results_strong_scaling_v4.csv", "w") as f:
+#     f.write("scenario,nodes,mean_time,std_time\n")
+results_strong = pd.read_csv("results_weak_scaling_v4.csv")
+for name in scenario_names:
+    y = results_strong[results_strong["scenario"] == name]["mean_time"]
+    yerr = results_strong[results_strong["scenario"] == name]["std_time"]
+    x = results_strong[results_strong["scenario"] == name]["nodes"]
+    plt.errorbar(x, y, yerr=yerr, label=name)
+plt.legend()
+plt.xscale("log")
+plt.ylabel("mean execution time [s]")
 # %%

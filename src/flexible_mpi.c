@@ -488,10 +488,10 @@ int main(int argc, char **argv)
         memset(local_n_matches_, 0, (endi - starti) * sizeof(int));
         int *local_n_matches = local_n_matches_ - starti;
 
-#pragma omp for schedule(static) collapse(2)
         /* Traverse the patterns */
         for (i = starti; i < endi; i++)
         {
+#pragma omp for schedule(static)
             /* Traverse the input data up to the end of the file */
             for (j = start_openmp; j < end_openmp; j++)
             {
