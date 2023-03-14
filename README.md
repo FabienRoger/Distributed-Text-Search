@@ -1,1 +1,3 @@
-# Distributed-Text-Search
+# Distributed Text Search - INF560 Project
+
+In this project, we developed a program to quickly search through a large corpus for approximates matches using the Levenshtein distance. We focus on parallelizing the search by splitting the data and the workload between different nodes using MPI, and between different CPU and GPU threads using OpenMP and Cuda. We run experiments to compare different strategies and tweak hyperparameters of our program. Our final program scales well with the number of nodes: it takes only 25\% more time to run it when multiplying the number of nodes and patterns by a factor of 8.
