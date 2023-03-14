@@ -56,11 +56,11 @@ chars = list(string.ascii_uppercase)
 
 def generate_random_string(length, nb=1):
     if nb == 0:
-        random_chars = np.random.choice(chars, size=length)
+        random_chars = np.random.choice(chars, size=length) # type:ignore
         return "".join(random_chars)
     else:
-        random_chars = np.random.choice(chars, size=(nb, length))
-        lengths = np.random.randint(1, length, size=nb)
+        random_chars = np.random.choice(chars, size=(nb, length)) # type:ignore
+        lengths = np.random.randint(1, length, size=nb) # type:ignore
         res = ["".join(random_chars[i, : lengths[i]]) for i in range(len(random_chars))]
         return res
 

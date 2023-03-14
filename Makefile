@@ -1,25 +1,21 @@
+OUT_DIR=out
 SRC_DIR=src
-HEADER_DIR=include
-OBJ_DIR=obj
 
-CC=gcc
-CFLAGS=-O3 -I$(HEADER_DIR) -Wall
-LDFLAGS=
+NAME=flexible_mpi
+OUT=$(OUT_DIR)/$(NAME)_exec
+TESTNAME=apm1
+TESTOUT=$(OUT_DIR)/apm1
+CUDAPATH=/usr/local/cuda/lib64
 
-SRC= apm.c
+all:
+	mkdir -p $(OUT_DIR)
+	mpicc -fopenmp -c $(SRC_DIR)/$(NAME).c -o out/$(NAME)
+	nvcc -I. -c $(SRC_DIR)/$(NAME).cu -o out/$(NAME)_cu
+	mpicc -fopenmp out/$(NAME) out/$(NAME)_cu -lcudart -L$(CUDAPATH) -o $(OUT)
 
-OBJ= $(OBJ_DIR)/apm.o
-
-all: $(OBJ_DIR) apm
-
-$(OBJ_DIR):
-	mkdir $(OBJ_DIR)
-
-$(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $^
-
-apm:$(OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+test:
+	mkdir -p $(OUT_DIR)
+	mpicc -o $(TESTOUT) $(SRC_DIR)/${TESTNAME}.c
 
 clean:
-	rm -f apm $(OBJ) ; rmdir $(OBJ_DIR)
+	rm -rf $(OUT_DIR)
