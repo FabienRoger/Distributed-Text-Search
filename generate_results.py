@@ -158,7 +158,7 @@ def measure_runtime(
 
 
 # Compare the different settings
-with open("results_v4.csv", "w") as f:
+with open("results/results_v4.csv", "w") as f:
     f.write("scenario,setting,mean_time,std_time\n")
 
     for scenario_name, scenario in scenarios.items():
@@ -180,7 +180,7 @@ with open("results_v4.csv", "w") as f:
         print()
 
 ### Perf vs percentage gpu
-with open("results_gpu_percentage_v4.csv", "w") as f:
+with open("results/results_gpu_percentage_v4.csv", "w") as f:
     f.write("scenario,percentage_gpu,mean_time,std_time\n")
 
     for scenario_name, scenario in scenarios.items():
@@ -202,7 +202,7 @@ with open("results_gpu_percentage_v4.csv", "w") as f:
         print()
 
 ### Perf vs ndata & npattern when distributed vs not, at constant workload
-with open("results_distributed_and_pattern_v4.csv", "w") as f:
+with open("results/results_distributed_and_pattern_v4.csv", "w") as f:
     f.write("distributed,ndata,npatterns,mean_time,std_time\n")
 
     WORK_LOAD = LARGE_FILE * 100
@@ -220,7 +220,7 @@ with open("results_distributed_and_pattern_v4.csv", "w") as f:
             f.flush()
             print()
 
-with open("results_distributed_and_pattern_v4_no_gpu.csv", "w") as f:
+with open("results/results_distributed_and_pattern_v4_no_gpu.csv", "w") as f:
     f.write("distributed,ndata,npatterns,mean_time,std_time\n")
 
     WORK_LOAD = LARGE_FILE * 100
@@ -240,7 +240,7 @@ with open("results_distributed_and_pattern_v4_no_gpu.csv", "w") as f:
 
 
 ### Weak scaling
-with open("results_weak_scaling_v4.csv", "w") as f:
+with open("results/results_weak_scaling_v4.csv", "w") as f:
     f.write("scenario,nodes,mean_time,std_time\n")
 
     for scenario_name, scenario in scenarios.items():
@@ -269,7 +269,7 @@ with open("results_weak_scaling_v4.csv", "w") as f:
         print()
 
 ### Perf vs number of threads and blocks
-with open("results_thread_block_v4.csv", "w") as f:
+with open("results/results_thread_block_v4.csv", "w") as f:
     f.write("scenario,thread_per_block,block_per_grid,mean_time,std_time\n")
 
     for scenario_name, scenario in scenarios.items():

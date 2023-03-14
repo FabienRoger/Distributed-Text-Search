@@ -14,7 +14,7 @@ scenario_names = [
     "small files 10 large patterns",
     "small files 1000 small patterns",
 ]
-results_gpu_percentage = pd.read_csv("results_gpu_percentage_v4.csv")
+results_gpu_percentage = pd.read_csv("results/results_gpu_percentage_v4.csv")
 for name in scenario_names:
     y = results_gpu_percentage[results_gpu_percentage["scenario"] == name]["mean_time"]
     yerr = results_gpu_percentage[results_gpu_percentage["scenario"] == name]["std_time"]
@@ -23,9 +23,9 @@ for name in scenario_names:
 plt.legend()
 plt.show()
 # %%
-# with open("results_thread_block_v4.csv", "w") as f:
+# with open("results/results_thread_block_v4.csv", "w") as f:
 #     f.write("scenario,thread_per_block,block_per_grid,mean_time,std_time\n")
-results_thread_block = pd.read_csv("results_thread_block_v4.csv")
+results_thread_block = pd.read_csv("results/results_thread_block_v4.csv")
 thread_per_block_values = results_thread_block["thread_per_block"].unique()
 block_per_grid_values = results_thread_block["block_per_grid"].unique()
 for name in scenario_names:
@@ -46,7 +46,7 @@ for name in scenario_names:
     plt.show()
 # %%
 ### Perf vs ndata & npattern when distributed vs not, at constant workload
-results_dist_pattern = pd.read_csv("results_distributed_and_pattern_v4.csv")
+results_dist_pattern = pd.read_csv("results/results_distributed_and_pattern_v4.csv")
 distribute_labels = ["patterns not distributed", "patterns distributed"]
 for distributed in [0, 1]:
     x = results_dist_pattern[results_dist_pattern["distributed"] == distributed]["ndata"]
@@ -61,7 +61,7 @@ plt.legend()
 plt.show()
 # %%
 ### Perf vs ndata & npattern when distributed vs not, at constant workload, NO GPU
-results_dist_pattern = pd.read_csv("results_distributed_and_pattern_v4_no_gpu.csv")
+results_dist_pattern = pd.read_csv("results/results_distributed_and_pattern_v4_no_gpu.csv")
 distribute_labels = ["patterns not distributed", "patterns distributed"]
 for distributed in [0, 1]:
     x = results_dist_pattern[results_dist_pattern["distributed"] == distributed]["ndata"]
@@ -78,9 +78,9 @@ plt.show()
 # %%
 
 # # Compare the different settings
-# with open("results_v4.csv", "w") as f:
+# with open("results/results_v4.csv", "w") as f:
 #     f.write("scenario,setting,mean_time,std_time\n")
-result_settings = pd.read_csv("results_v4.csv")
+result_settings = pd.read_csv("results/results_v4.csv")
 
 # hbar plots of the different settings
 
@@ -102,9 +102,9 @@ plt.xlabel("mean execution time [s]")
 plt.legend()
 # %%
 ### Weak scaling
-# with open("results_strong_scaling_v4.csv", "w") as f:
+# with open("results/results_strong_scaling_v4.csv", "w") as f:
 #     f.write("scenario,nodes,mean_time,std_time\n")
-results_weak = pd.read_csv("results_weak_scaling_v4.csv")
+results_weak = pd.read_csv("results/results_weak_scaling_v4.csv")
 for name in scenario_names:
     y = results_weak[results_weak["scenario"] == name]["mean_time"]
     yerr = results_weak[results_weak["scenario"] == name]["std_time"]
