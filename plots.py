@@ -97,7 +97,7 @@ for i, setting in enumerate(settings):  # type: ignore
         label=setting,
     )
 plt.ylabel("scenario")
-plt.yticks(ys, scenarios) # type: ignore
+plt.yticks(ys, scenarios)  # type: ignore
 plt.xlabel("mean execution time [s]")
 plt.legend()
 # %%
@@ -114,7 +114,12 @@ for name in scenario_names:
 plt.ylim(0, results_weak["mean_time"].max() * 1.1)
 plt.ylabel("mean execution time [s]")
 first_point = results_weak[results_weak["nodes"] == 1]["mean_time"].mean()
-plt.plot([1, results_weak["nodes"].max()], [first_point, first_point * results_weak["nodes"].max()], "--", label="linear scaling")
+plt.plot(
+    [1, results_weak["nodes"].max()],
+    [first_point, first_point * results_weak["nodes"].max()],
+    "--",
+    label="linear scaling",
+)
 plt.legend()
 plt.xlabel("number of nodes")
 # %%

@@ -212,7 +212,13 @@ with open("results/results_distributed_and_pattern_v4.csv", "w") as f:
             print(f"Running with {ndata} data and {npatterns} patterns, distributed={distributed}")
 
             mean_time, std_time = measure_runtime(
-                5, {"DISTRIBUTE_PATTERNS": distributed}, ndata, npatterns, SMALL_PATTERN, 4, 4
+                5,
+                {"DISTRIBUTE_PATTERNS": distributed},
+                ndata,
+                npatterns,
+                SMALL_PATTERN,
+                4,
+                4,
             )
             print(f"Total runtime {mean_time:.2f} s")
 
@@ -230,7 +236,13 @@ with open("results/results_distributed_and_pattern_v4_no_gpu.csv", "w") as f:
             print(f"Running with {ndata} data and {npatterns} patterns, distributed={distributed}")
 
             mean_time, std_time = measure_runtime(
-                5, {"DISTRIBUTE_PATTERNS": distributed, "PERCENTAGE_GPU": 0}, ndata, npatterns, SMALL_PATTERN, 4, 4
+                5,
+                {"DISTRIBUTE_PATTERNS": distributed, "PERCENTAGE_GPU": 0},
+                ndata,
+                npatterns,
+                SMALL_PATTERN,
+                4,
+                4,
             )
             print(f"Total runtime {mean_time:.2f} s")
 
